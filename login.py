@@ -9,6 +9,19 @@ class login(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setUpUi()
+        self.usuarios = [
+            {"usuario": "Marvin" , "password": "58101169"},
+            {"usuario": "Yavar", "password": "84635922"},
+            {"usuario": "Celia", "password": "87253629"},
+            {"usuario": "Ariel", "password": "89268598"}
+        ]
+
+        self.clientes = [
+            {"correo": "elhh1985@gmail.com", "password": "Familia1"},
+            {"correo": "didi@gmail.com", "password": "Familia2"}
+        ]
+
+        self.intentosLogIn = 0
 
     def setUpUi(self):
 
@@ -85,13 +98,14 @@ class login(QMainWindow):
         self.loginTxt.setObjectName("loginTxt")
 
         self.input_user = QLineEdit()
-        self.input_user.setPlaceholderText("Ingresar usuario")
+        self.input_user.setPlaceholderText("Ingresar usuario o correo")
 
         self.input_password = QLineEdit()
         self.input_password.setPlaceholderText("Ingresar contraseña")
         self.input_password.setEchoMode(QLineEdit.Password)
+        self.input_password.setMaxLength(8)
 
-        self.btnIni = QPushButton("Push me")
+        self.btnIni = QPushButton("Iniciar Sesion")
         self.btnIni.clicked.connect(self.iniciarSesion)
 
         layout.addWidget(self.loginTxt)
@@ -100,7 +114,54 @@ class login(QMainWindow):
         layout.addWidget(self.btnIni)
 
     def iniciarSesion(self):
-        pass
+        usuario = self.input_user.text()
+        password = self.input_password.text()
+        correo = self.input_user.text()
+
+        if len(password) != 8:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "La contraseña debe tener 8 caracteres maximo."
+            )
+            return
+        
+        for admin in self.usuarios:
+            if admin["usuario"] == usuario and admin["password"] == password:
+                QMessageBox(
+                    self,
+                    "Inicio de Sesion",
+                    "Inicio de sesion como administrador exitoso."
+                )
+
+        for cliente in self.clientes:
+            if cliente["correo"] == correo and cliente["password"] == password:
+                QMessageBox.information(
+                    self,
+                    "Inicio de Sesion",
+                    "Inicio de sesion como cliente exitosa."
+                )
+
+        self.intentosLogIn += 1
+
+        if self.intentosLogIn >= 3:
+            QMessageBox.critical(
+                self,
+                "Cuenta Bloqueada",
+                "Has superado el limite de 3 intentos."
+            )
+
+            self.btnIni.setEnabled(False)
+            self.input_user.setEnabled(False)
+            self.input_password.setEnabled(False)
+        else:
+            restantes = 3 - self.intentosLogIn
+            QMessageBox.warning(
+                self,
+                "Error",
+                F"Correo o contraseña incorrecta.\n"
+                f"Te quedan {restantes} intentos."
+            )
 
 
 window = login()
