@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import *
+from PySide6.QtGui import QIcon
 import sys
 
 app = QApplication([])
@@ -14,6 +15,7 @@ class login(QMainWindow):
         self.setFixedSize(500, 500)
 
         self.setWindowTitle("Sistema Crediticio")
+        self.setWindowIcon(QIcon("img/logoBG.png"))
 
         self.setStyleSheet("""
             QMainWindow {
@@ -83,13 +85,13 @@ class login(QMainWindow):
         self.loginTxt.setObjectName("loginTxt")
 
         self.input_user = QLineEdit()
-        self.input_user.setPlaceholderText("Ingresar usuario ♦")
+        self.input_user.setPlaceholderText("Ingresar usuario")
 
         self.input_password = QLineEdit()
-        self.input_password.setPlaceholderText("Ingresar contraseña ☻")
+        self.input_password.setPlaceholderText("Ingresar contraseña")
         self.input_password.setEchoMode(QLineEdit.Password)
 
-        self.btnIni = QPushButton("Push me ♥")
+        self.btnIni = QPushButton("Push me")
         self.btnIni.clicked.connect(self.iniciarSesion)
 
         layout.addWidget(self.loginTxt)
