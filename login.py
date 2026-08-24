@@ -1,8 +1,9 @@
 from PySide6.QtWidgets import *
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon, QPixmap
+from GUI_ADMIN import AdminWindow
+from pathlib import Path #
 import sys
-
-app = QApplication([])
 
 
 class login(QMainWindow):
@@ -25,32 +26,30 @@ class login(QMainWindow):
 
     def setUpUi(self):
 
-        self.setFixedSize(500, 500)
+        self.resize(1200, 700)
 
         self.setWindowTitle("Sistema Crediticio")
-        self.setWindowIcon(QIcon("img/logoBG.png"))
+        logo_path = Path(__file__).resolve().parent / "img" / "logoBG.png"
+        self.setWindowIcon(QIcon(str(logo_path)))
 
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #121826;
+                background-color: #F5F5F5;
             }
 
             #frame1 {
-                background-color: #1E293B;
+                background-color: #D3D3D3;
                 border-radius: 15px;
+                border: 5px solid #000000;
             }
 
-            #loginTxt {
-                color: #F8FAFC;
-                font-size: 28px;
-                font-weight: bold;
-                padding: 10px;
-                margin-left: 40px;
+            #logo {
+                background-color: transparent;
             }
 
             QLineEdit {
-                background-color: #0F172A;
-                color: #F8FAFC;
+                background-color: #D3D3D3;
+                color: #000;
                 border: 2px solid #334155;
                 border-radius: 8px;
                 padding: 10px;
@@ -61,8 +60,12 @@ class login(QMainWindow):
                 border: 2px solid #3B82F6;
             }
 
+            QLineEdit, QPushButton {
+                min-height: 24px;
+            }
+
             QLineEdit::placeholder {
-                color: #64748B;
+                color: #000;
             }
 
             QPushButton {
@@ -84,18 +87,31 @@ class login(QMainWindow):
             }
         """)
 
-        self.frame1 = QFrame(self)
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+
+        outer_layout = QGridLayout(central_widget)
+        outer_layout.setContentsMargins(30, 30, 30, 30)
+
+        self.frame1 = QFrame()
         self.frame1.setObjectName("frame1")
-        self.frame1.setGeometry(50, 70, 400, 330)
+        self.frame1.setFixedWidth(440)
+        outer_layout.addWidget(self.frame1, 0, 0, Qt.AlignCenter)
 
         layout = QVBoxLayout(self.frame1)
 
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(15)
+        layout.setContentsMargins(40, 32, 40, 40)
+        layout.setSpacing(18)
 
         # Título
-        self.loginTxt = QLabel("Sistema Crediticio")
-        self.loginTxt.setObjectName("loginTxt")
+        self.logo = QLabel()
+        self.logo.setObjectName("logo")
+        self.logo.setAlignment(Qt.AlignCenter)
+        self.logo.setPixmap(
+            QPixmap(str(logo_path)).scaled(
+                320, 175, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        )
 
         self.input_user = QLineEdit()
         self.input_user.setPlaceholderText("Ingresar usuario o correo")
@@ -108,7 +124,7 @@ class login(QMainWindow):
         self.btnIni = QPushButton("Iniciar Sesion")
         self.btnIni.clicked.connect(self.iniciarSesion)
 
-        layout.addWidget(self.loginTxt)
+        layout.addWidget(self.logo)
         layout.addWidget(self.input_user)
         layout.addWidget(self.input_password)
         layout.addWidget(self.btnIni)
@@ -128,11 +144,17 @@ class login(QMainWindow):
         
         for admin in self.usuarios:
             if admin["usuario"] == usuario and admin["password"] == password:
-                QMessageBox(
+                QMessageBox.information(
                     self,
                     "Inicio de Sesion",
                     "Inicio de sesion como administrador exitoso."
                 )
+
+                self.ventana_admin = AdminWindow()
+                self.ventana_admin.show()
+                self.close()
+                
+                return
 
         for cliente in self.clientes:
             if cliente["correo"] == correo and cliente["password"] == password:
@@ -164,7 +186,8 @@ class login(QMainWindow):
             )
 
 
-window = login()
-
-window.show()
-app.exec()
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = login()
+    window.showMaximized()
+    sys.exit(app.exec())
