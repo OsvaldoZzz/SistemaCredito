@@ -1,0 +1,1 @@
+QStackedLayout() este es para mostrar uno a la vez, tipo un modal

@@ -11,15 +11,15 @@ class login(QMainWindow):
         super().__init__()
         self.setUpUi()
         self.usuarios = [
-            {"usuario": "Marvin" , "password": "58101169"},
+            {"usuario": "Marvin" , "password": "12345678"},
             {"usuario": "Yavar", "password": "84635922"},
             {"usuario": "Celia", "password": "87253629"},
             {"usuario": "Ariel", "password": "89268598"}
         ]
 
         self.clientes = [
-            {"correo": "elhh1985@gmail.com", "password": "Familia1"},
-            {"correo": "didi@gmail.com", "password": "Familia2"}
+            {"nombre": "Cliente 1","correo": "elhh1985@gmail.com", "password": "Familia1", "monto" : "1000"},
+            {"nombre": "Cliente 2", "correo": "didi@gmail.com", "password": "Familia2", "monto": "20000"}
         ]
 
         self.intentosLogIn = 0
@@ -40,7 +40,8 @@ class login(QMainWindow):
             #frame1 {
                 background-color: #D3D3D3;
                 border-radius: 15px;
-                border: 5px solid #000000;
+                border: 3px solid #000;
+                px solid #000000;
             }
 
             #logo {
@@ -150,7 +151,7 @@ class login(QMainWindow):
                     "Inicio de sesion como administrador exitoso."
                 )
 
-                self.ventana_admin = AdminWindow()
+                self.ventana_admin = AdminWindow(self.clientes)
                 self.ventana_admin.show()
                 self.close()
                 
