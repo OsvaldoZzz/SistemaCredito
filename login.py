@@ -19,7 +19,7 @@ class login(QMainWindow):
         ]
 
         self.clientes = [
-            {"nombre": "Cliente 1","correo": "elhh1985@gmail.com", "password": "Familia1", "monto" : "1000"},
+            {"nombre": "Cliente 1","correo": "ejemplo2@gmail.com", "password": "87654321", "monto" : "1000"},
             {"nombre": "Cliente 2", "correo": "ejemplo@gmail.com", "password": "12345678", "monto": "20000"}
         ]
 
