@@ -1,5 +1,7 @@
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QHeaderView
+
 
 
 class AdminWindow(QMainWindow):
@@ -88,12 +90,29 @@ class AdminWindow(QMainWindow):
             }
 
             QPushButton#abonar_prestamo{
-                background-color: yellow;
+                background-color: #FFD400;
             }
 
             QPushButton#eliminar_prestamo{
                 background-color: red;
             }
+
+            QTableWidget {
+                background-color: #3a3a3a;
+                color: white;
+                gridline-color: #555555;
+            }
+
+            QTableWidget::item {
+                background-color: #3a3a3a;
+                color: white;
+            }
+
+            QHeaderView::section {
+                background-color: #252525;
+                color: white;
+            }
+
 
         """)
 
@@ -170,8 +189,10 @@ class AdminWindow(QMainWindow):
             "Plazo",
             "Estado"
         ])
+        self.tablaPrestamos.setObjectName("tablaPrestamos")
 
-        prestamosLayout.addWidget(self.tablaPrestamos)
+        self.tablaPrestamos.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        prestamosLayout.addWidget(self.tablaPrestamos, 1)
 
         # CAMBIO: espacio que empuja el botón hacia abajo
         prestamosLayout.addStretch()
@@ -204,9 +225,6 @@ class AdminWindow(QMainWindow):
         # CAMBIO: las dos zonas ocupan toda la altura disponible
         layout.setRowStretch(0, 1)
 
-    # ==============================================================
-    # MOSTRAR INFORMACIÓN DEL CLIENTE
-    # ==============================================================
 
     def mostrarCliente(self, item):
 

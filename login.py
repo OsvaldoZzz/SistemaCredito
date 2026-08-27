@@ -2,6 +2,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QPixmap
 from GUI_ADMIN import AdminWindow
+from GUI_CLIENTE import ClienteWindow
 from pathlib import Path #
 import sys
 
@@ -164,6 +165,13 @@ class login(QMainWindow):
                     "Inicio de Sesion",
                     "Inicio de sesion como cliente exitosa."
                 )
+
+                self.ventana_cliente = ClienteWindow(cliente)
+                self.ventana_cliente.show()
+                self.close
+                return
+
+        
 
         self.intentosLogIn += 1
 
