@@ -63,8 +63,25 @@ class AdminWindow(QMainWindow):
                 border-radius: 10px;
             }
 
+            QTableWidget {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 10px;
+                color: #1e293b;
+                font-size: 15px;
+                gridline-color: #e5e7eb;
+            }
+
+            QHeaderView::section {
+                background-color: #3B82F6;
+                color: white;
+                padding: 10px;
+                border: none;
+                font-weight: bold;
+            }
+
             QPushButton {
-                background-color: #00BB77;
+                background-color: #3B82F6;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -85,6 +102,10 @@ class AdminWindow(QMainWindow):
                 background-color: red;
             }
 
+            QPushButton:hover#cerrarSesion{
+                background-color: red;
+            }
+
             QPushButton:hover#crear_prestamo{
                 background-color: green;
             }
@@ -99,22 +120,6 @@ class AdminWindow(QMainWindow):
 
             QPushButton:hover#editar_prestamo{
                 background-color: gold;
-            }
-
-            QTableWidget {
-                background-color: #3a3a3a;
-                color: white;
-                gridline-color: #555555;
-            }
-
-            QTableWidget::item {
-                background-color: #3a3a3a;
-                color: white;
-            }
-
-            QHeaderView::section {
-                background-color: #252525;
-                color: white;
             }
 
 
@@ -158,12 +163,16 @@ class AdminWindow(QMainWindow):
         self.btnDelete = QPushButton("Eliminar Cliente")
         self.btnDelete.setObjectName("eliminar_cliente")
 
+        self.btnCerrar = QPushButton("Cerrar Sesion")
+        self.btnCerrar.setObjectName("cerrarSesion")
+
         self.btnCreate.clicked.connect(self.btnsCreate)
 
         # CAMBIO: los botones se agregan al layout del panel izquierdo
         # y NO al layout principal
         botonesLayout.addWidget(self.btnCreate)
         botonesLayout.addWidget(self.btnDelete)
+        botonesLayout.addWidget(self.btnCerrar)
 
         clientesLayout.addLayout(botonesLayout)
 
@@ -200,6 +209,25 @@ class AdminWindow(QMainWindow):
             "Estado"
         ])
         self.tablaPrestamos.setObjectName("tablaPrestamos")
+
+        # Ejemplo temporal
+        self.tablaPrestamos.setRowCount(1)
+
+        self.tablaPrestamos.setItem(
+            0, 0, QTableWidgetItem("001")
+        )
+
+        self.tablaPrestamos.setItem(
+            0, 1, QTableWidgetItem("C$20,000")
+        )
+
+        self.tablaPrestamos.setItem(
+            0, 2, QTableWidgetItem("10 cuotas")
+        )
+
+        self.tablaPrestamos.setItem(
+            0, 3, QTableWidgetItem("Activo")
+        )
 
         self.tablaPrestamos.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         prestamosLayout.addWidget(self.tablaPrestamos, 1)

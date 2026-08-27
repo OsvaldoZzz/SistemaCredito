@@ -40,7 +40,7 @@ class ClienteWindow(QMainWindow):
             }
 
             QHeaderView::section {
-                background-color: #3b82f6;
+                background-color: #3B82F6;
                 color: white;
                 padding: 10px;
                 border: none;
@@ -48,7 +48,7 @@ class ClienteWindow(QMainWindow):
             }
 
             QPushButton {
-                background-color: #00BB77;
+                background-color: #3B82F6;
                 color: white;
                 border: none;
                 border-radius: 8px;

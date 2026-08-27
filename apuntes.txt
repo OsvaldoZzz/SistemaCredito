@@ -1,1 +1,5 @@
 QStackedLayout() este es para mostrar uno a la vez, tipo un modal
+
+#QSS
+Color verde jade: #00BB77
+Color celestito: #3B82F6

@@ -88,8 +88,12 @@ class login(QMainWindow):
                 background-color: #1D4ED8;
             }
 
-            QPushButton#IniciarSe{
+            QPushButton:hover#IniciarSe{
                 background-color: green;
+            }
+
+            QPushButton:hover#crear{
+                background-color: gold;
             }
 
         """)
@@ -136,6 +140,7 @@ class login(QMainWindow):
         self.btnIni.setObjectName("IniciarSe")
 
         self.btnCrear = QPushButton("Crear Cliente")
+        self.btnCrear.setObjectName("crear")
         self.btnCrear.clicked.connect(self.crearCl)
 
 
