@@ -87,6 +87,11 @@ class login(QMainWindow):
             QPushButton:pressed {
                 background-color: #1D4ED8;
             }
+
+            QPushButton#IniciarSe{
+                background-color: green;
+            }
+
         """)
 
         central_widget = QWidget()
@@ -123,13 +128,23 @@ class login(QMainWindow):
         self.input_password.setEchoMode(QLineEdit.Password)
         self.input_password.setMaxLength(8)
 
+        botones_layout = QHBoxLayout() #Para poner los botones lado a lado.
+
+
         self.btnIni = QPushButton("Iniciar Sesion")
         self.btnIni.clicked.connect(self.iniciarSesion)
+        self.btnIni.setObjectName("IniciarSe")
+
+        self.btnCrear = QPushButton("Crear Cliente")
+        self.btnCrear.clicked.connect(self.crearCl)
+
 
         layout.addWidget(self.logo)
         layout.addWidget(self.input_user)
         layout.addWidget(self.input_password)
-        layout.addWidget(self.btnIni)
+        botones_layout.addWidget(self.btnIni)
+        botones_layout.addWidget(self.btnCrear)
+        layout.addLayout(botones_layout)
 
     def iniciarSesion(self):
         usuario = self.input_user.text()
@@ -194,6 +209,8 @@ class login(QMainWindow):
                 f"Te quedan {restantes} intentos."
             )
 
+    def crearCl (self):
+        pass
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

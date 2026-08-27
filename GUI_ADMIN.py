@@ -64,7 +64,7 @@ class AdminWindow(QMainWindow):
             }
 
             QPushButton {
-                background-color: #3b82f6;
+                background-color: #00BB77;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -77,24 +77,28 @@ class AdminWindow(QMainWindow):
                 background-color: #2563eb;
             }
 
-            QPushButton#crear_cliente{
+            QPushButton:hover#crear_cliente{
                 background-color: green;
             }
 
-            QPushButton#eliminar_cliente{
+            QPushButton:hover#eliminar_cliente{
                 background-color: red;
             }
 
-            QPushButton#crear_prestamo{
+            QPushButton:hover#crear_prestamo{
                 background-color: green;
             }
 
-            QPushButton#abonar_prestamo{
+            QPushButton:hover#abonar_prestamo{
                 background-color: #FFD400;
             }
 
-            QPushButton#eliminar_prestamo{
+            QPushButton:hover#eliminar_prestamo{
                 background-color: red;
+            }
+
+            QPushButton:hover#editar_prestamo{
+                background-color: gold;
             }
 
             QTableWidget {
@@ -144,6 +148,9 @@ class AdminWindow(QMainWindow):
 
         clientesLayout.addWidget(self.listaClientes)
 
+        #botones pa horizontal xd
+        botonesLayout = QHBoxLayout()
+
         # CAMBIO: botones del panel izquierdo
         self.btnCreate = QPushButton("Crear Cliente")
         self.btnCreate.setObjectName("crear_cliente")
@@ -155,8 +162,10 @@ class AdminWindow(QMainWindow):
 
         # CAMBIO: los botones se agregan al layout del panel izquierdo
         # y NO al layout principal
-        clientesLayout.addWidget(self.btnCreate)
-        clientesLayout.addWidget(self.btnDelete)
+        botonesLayout.addWidget(self.btnCreate)
+        botonesLayout.addWidget(self.btnDelete)
+
+        clientesLayout.addLayout(botonesLayout)
 
         # CAMBIO: agregamos el panel completo al Grid
         layout.addWidget(panelClientes, 0, 0)
@@ -167,6 +176,7 @@ class AdminWindow(QMainWindow):
         panelPrestamos.setObjectName("panelPrestamos")
 
         prestamosLayout = QVBoxLayout(panelPrestamos)
+        botonesLayout2 = QHBoxLayout()
 
         prestamosTitulo = QLabel("Préstamos del cliente")
         prestamosLayout.addWidget(prestamosTitulo)
@@ -201,17 +211,23 @@ class AdminWindow(QMainWindow):
         self.btnCreatePrestamo = QPushButton("Crear Prestamo")
         self.btnCreatePrestamo.setObjectName("crear_prestamo")
 
+        self.btnEditPrestamo = QPushButton("Editar Prestamo")
+        self.btnEditPrestamo.setObjectName("editar_prestamo")
 
-        self.btnAbonarPrestamo = QPushButton("Abonar")
+
+        self.btnAbonarPrestamo = QPushButton("Abonar Prestamo")
         self.btnAbonarPrestamo.setObjectName("abonar_prestamo")
 
         self.btnEliminarPrestamo = QPushButton("Eliminar Prestamo") 
         self.btnEliminarPrestamo.setObjectName("eliminar_prestamo")
 
 
-        prestamosLayout.addWidget(self.btnCreatePrestamo)
-        prestamosLayout.addWidget(self.btnAbonarPrestamo)
-        prestamosLayout.addWidget(self.btnEliminarPrestamo)
+        botonesLayout2.addWidget(self.btnCreatePrestamo)
+        botonesLayout2.addWidget(self.btnEditPrestamo)
+        botonesLayout2.addWidget(self.btnAbonarPrestamo)
+        botonesLayout2.addWidget(self.btnEliminarPrestamo)
+
+        prestamosLayout.addLayout(botonesLayout2)
 
         # CAMBIO: agregamos el panel derecho al Grid
         layout.addWidget(panelPrestamos, 0, 1)

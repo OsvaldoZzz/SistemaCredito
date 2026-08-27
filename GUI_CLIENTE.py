@@ -48,7 +48,7 @@ class ClienteWindow(QMainWindow):
             }
 
             QPushButton {
-                background-color: #3b82f6;
+                background-color: #00BB77;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -60,6 +60,19 @@ class ClienteWindow(QMainWindow):
             QPushButton:hover {
                 background-color: #2563eb;
             }
+
+            QPushButton:hover#solicitud {
+                background-color: green;
+            }
+
+            QPushButton:hover#abonar {
+                background-color: gold;
+            }
+
+            QPushButton:hover#cerrar {
+                background-color: red;
+            }
+
         """)
 
         
@@ -146,9 +159,22 @@ class ClienteWindow(QMainWindow):
 
         layoutFrame.addStretch()
 
+        botonesLayout = QHBoxLayout()
+
+        self.btnSoli = QPushButton("Solicitar Prestamo")
+        self.btnSoli.setObjectName("solicitud")
+
+        self.btnAbonar = QPushButton("Abonar Prestamo")
+        self.btnAbonar.setObjectName("abonar")
+
         self.btnCerrar = QPushButton("Cerrar Sesión")
+        self.btnCerrar.setObjectName("cerrar")
 
-        layoutFrame.addWidget(self.btnCerrar)
 
+        botonesLayout.addWidget(self.btnSoli)
+        botonesLayout.addWidget(self.btnAbonar)
+        botonesLayout.addWidget(self.btnCerrar)
+
+        layoutFrame.addLayout(botonesLayout)
 
         layoutPrincipal.addWidget(frame)
