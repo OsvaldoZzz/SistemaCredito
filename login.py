@@ -19,8 +19,8 @@ class login(QMainWindow):
         ]
 
         self.clientes = [
-            {"nombre": "Cliente 1","correo": "ejemplo2@gmail.com", "password": "87654321", "monto" : "1000"},
-            {"nombre": "Cliente 2", "correo": "ejemplo@gmail.com", "password": "12345678", "monto": "20000"}
+            {"nombre": "Cliente 1", "cedula" : "281-123456-1000A", "correo": "ejemplo2@gmail.com", "password": "87654321", "direccion": "Iglesia San Isidro 1/2 cuadra bajo", "monto" : "1000"},
+            {"nombre": "Cliente 2", "cedula" : "281-123456-1007W", "correo": "ejemplo@gmail.com", "password": "12345678", "direccion": "Iglesia San Isidro 2 cuadra bajo", "monto": "20000"}
         ]
 
         self.intentosLogIn = 0
@@ -172,7 +172,7 @@ class login(QMainWindow):
                     "Inicio de sesion como administrador exitoso."
                 )
 
-                self.ventana_admin = AdminWindow(self.clientes)
+                self.ventana_admin = AdminWindow(self.clientes, self)
                 self.ventana_admin.show()
                 self.close()
                 
@@ -215,7 +215,77 @@ class login(QMainWindow):
             )
 
     def crearCl (self):
-        pass
+        layoutCC = QWidget()
+        layoutCC.setWindowTitle("Crear Cliente")
+        layoutCC.resize(300, 200)
+
+        form_layout = QFormLayout(layoutCC)
+        form_layout.setObjectName("formCCl")
+        self.infoName = QLineEdit("")
+        self.infoName.setPlaceholderText("Ingresa tu nombre...")
+        self.infoName.setMaxLength(10)
+
+        self.infoEmail = QLineEdit("")
+        self.infoEmail.setPlaceholderText("Ingresa tu correo electronico...")
+
+        self.infoCedula = QLineEdit("")
+        self.infoCedula.setPlaceholderText("Ingresa tu cedula")
+        self.infoCedula.setMaxLength(14)
+
+        self.infoPassword = QLineEdit("")
+        self.infoPassword.setPlaceholderText("Ingresa tu contraseña...")
+        self.infoPassword.setMaxLength(8)
+
+        self.infoDir = QLineEdit("")
+        self.infoDir.setPlaceholderText("Ingresa tu direccion...")
+        self.infoDir.setMaxLength(40)
+
+        self.btnEnviar = QPushButton("Enviar")
+        self.btnEnviar.clicked.connect(self.enviarForm)
+        self.btnEnviar.setObjectName("btnEnviar")
+
+        form_layout.addWidget(self.infoName)
+        form_layout.addWidget(self.infoCedula)
+        form_layout.addWidget(self.infoEmail)
+        form_layout.addWidget(self.infoPassword)
+        form_layout.addWidget(self.infoDir)
+
+        form_layout.addWidget(self.btnEnviar)
+
+
+        layoutCC.show()
+        self.ventanaCrear = layoutCC
+
+    def enviarForm(self):
+        if(
+            not self.infoName.text().strip()
+            or not self.infoCedula.text().strip()
+            or not self.infoEmail.text().strip()
+            or not self.infoPassword.text().strip()
+            or not self.infoDir.text().strip()
+        ):
+            QMessageBox.warning(
+                self,
+                "Campos Vacios",
+                "Debes llenar todos los campos."
+            )
+            return
+
+        self.newCl = [{
+            "nombre": self.infoName.text(),
+            "cedula": self.infoCedula.text(),
+            "correo": self.infoEmail.text(),
+            "password": self.infoPassword.text(),
+            "direccion": self.infoDir.text()
+            }]
+
+        self.clientes.append(self.newCl)
+
+        QMessageBox.information(
+            self,
+            "Cliente creado",
+            "El cliente se creo correctamente."
+        )
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

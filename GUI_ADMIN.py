@@ -3,12 +3,13 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QHeaderView
 
 
-
 class AdminWindow(QMainWindow):
-    def __init__(self, clientes):
+    def __init__(self, clientes, ventana_login):
         super().__init__()
         self.clientes = clientes
         self.setAdmin()
+
+        self.ventana_login = ventana_login
 
     def setAdmin(self):
         self.showMaximized()
@@ -166,7 +167,8 @@ class AdminWindow(QMainWindow):
         self.btnCerrar = QPushButton("Cerrar Sesion")
         self.btnCerrar.setObjectName("cerrarSesion")
 
-        self.btnCreate.clicked.connect(self.btnsCreate)
+        self.btnCreate.clicked.connect(self.crearCl)
+        self.btnCerrar.clicked.connect(self.btnCerrSes)
 
         # CAMBIO: los botones se agregan al layout del panel izquierdo
         # y NO al layout principal
@@ -292,6 +294,90 @@ class AdminWindow(QMainWindow):
     # BOTÓN CREAR CLIENTE
     # ==============================================================
 
-    def btnsCreate(self):
+    def crearCl (self):
+        layoutCC = QWidget()
+        layoutCC.setWindowTitle("Crear Cliente")
+        layoutCC.resize(300, 200)
 
-        createCliente = self.btnCreate
+        form_layout = QFormLayout(layoutCC)
+        form_layout.setObjectName("formCCl")
+        self.infoName = QLineEdit("")
+        self.infoName.setPlaceholderText("Ingresa tu nombre...")
+        self.infoName.setMaxLength(10)
+
+        self.infoEmail = QLineEdit("")
+        self.infoEmail.setPlaceholderText("Ingresa tu correo electronico...")
+
+        self.infoCedula = QLineEdit("")
+        self.infoCedula.setPlaceholderText("Ingresa tu cedula")
+        self.infoCedula.setMaxLength(16)
+
+        self.infoPassword = QLineEdit("")
+        self.infoPassword.setPlaceholderText("Ingresa tu contraseña...")
+        self.infoPassword.setMaxLength(8)
+
+        self.infoDir = QLineEdit("")
+        self.infoDir.setPlaceholderText("Ingresa tu direccion...")
+        self.infoDir.setMaxLength(40)
+
+        self.btnEnviar = QPushButton("Enviar")
+        self.btnEnviar.clicked.connect(self.enviarForm)
+        self.btnEnviar.setObjectName("btnEnviar")
+
+        form_layout.addWidget(self.infoName)
+        form_layout.addWidget(self.infoCedula)
+        form_layout.addWidget(self.infoEmail)
+        form_layout.addWidget(self.infoPassword)
+        form_layout.addWidget(self.infoDir)
+
+        form_layout.addWidget(self.btnEnviar)
+
+
+        layoutCC.show()
+        self.ventanaCrear = layoutCC
+
+    def enviarForm(self):
+        if(
+            not self.infoName.text().strip()
+            or not self.infoCedula.text().strip()
+            or not self.infoEmail.text().strip()
+            or not self.infoPassword.text().strip()
+            or not self.infoDir.text().strip()
+        ):
+            QMessageBox.warning(
+                self,
+                "Campos Vacios",
+                "Debes llenar todos los campos."
+            )
+            return
+
+        self.newCl = {
+            "nombre": self.infoName.text(),
+            "cedula": self.infoCedula.text(),
+            "correo": self.infoEmail.text(),
+            "password": self.infoPassword.text(),
+            "direccion": self.infoDir.text()
+            }
+
+        self.clientes.append(self.newCl)
+
+        QMessageBox.information(
+            self,
+            "Cliente creado",
+            "El cliente se creo correctamente."
+        )
+
+        self.ventanaCrear.close()
+
+    def btnCerrSes(self):
+        QMessageBox(
+            self,
+            "Cerrando sesion",
+            "Saliendo del sistema... :)"
+        ) 
+        
+        self.ventana_login.input_user.clear()
+        self.ventana_login.input_password.clear()
+
+        self.close()
+        self.ventana_login.showMaximized()
