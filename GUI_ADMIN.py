@@ -6,10 +6,14 @@ from PySide6.QtWidgets import QHeaderView
 class AdminWindow(QMainWindow):
     def __init__(self, clientes, ventana_login):
         super().__init__()
-        self.clientes = clientes
-        self.setAdmin()
 
+        self.clientes = clientes
         self.ventana_login = ventana_login
+
+        # Obtiene el usuario directamente del login
+        self.usuario = self.ventana_login.input_user.text()
+
+        self.setAdmin()
 
     def setAdmin(self):
         self.showMaximized()
@@ -21,11 +25,35 @@ class AdminWindow(QMainWindow):
                 background-color: #f5f6fa;
             }
 
+            /* ENCABEZADO */
+
+            QWidget#encabezado {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 10px;
+            }
+
+            QLabel#tituloPanel {
+                color: #1e293b;
+                font-size: 22px;
+                font-weight: bold;
+            }
+
+            QLabel#infoUsuario {
+                color: #64748b;
+                font-size: 16px;
+                font-weight: bold;
+            }
+
+            /* TITULOS */
+
             QLabel {
                 color: #1e293b;
                 font-size: 18px;
                 font-weight: bold;
             }
+
+            /* LISTA DE CLIENTES */
 
             QListWidget {
                 background-color: white;
@@ -51,18 +79,35 @@ class AdminWindow(QMainWindow):
                 color: white;
             }
 
+            /* PANELES */
+
             QWidget#panelPrestamos {
                 background-color: white;
                 border: 1px solid #d1d5db;
                 border-radius: 10px;
             }
 
-            /* CAMBIO: estilo para el panel izquierdo */
             QWidget#panelClientes {
                 background-color: white;
                 border: 1px solid #d1d5db;
                 border-radius: 10px;
             }
+
+            /* INFORMACION DEL CLIENTE */
+
+            QLabel#lblCliente {
+                color: #1e293b;
+                font-size: 20px;
+                font-weight: bold;
+            }
+
+            QLabel#lblCorreo {
+                color: #64748b;
+                font-size: 14px;
+                font-weight: normal;
+            }
+
+            /* TABLA */
 
             QTableWidget {
                 background-color: white;
@@ -81,6 +126,8 @@ class AdminWindow(QMainWindow):
                 font-weight: bold;
             }
 
+            /* BOTONES */
+
             QPushButton {
                 background-color: #3B82F6;
                 color: white;
@@ -95,35 +142,37 @@ class AdminWindow(QMainWindow):
                 background-color: #2563eb;
             }
 
-            QPushButton:hover#crear_cliente{
+            QPushButton:hover#crear_cliente {
                 background-color: green;
             }
 
-            QPushButton:hover#eliminar_cliente{
+            QPushButton:hover#eliminar_cliente {
                 background-color: red;
             }
 
-            QPushButton:hover#cerrarSesion{
+            QPushButton:hover#cerrarSesion {
                 background-color: red;
             }
 
-            QPushButton:hover#crear_prestamo{
+            QPushButton:hover#crear_prestamo {
                 background-color: green;
             }
 
-            QPushButton:hover#abonar_prestamo{
+            QPushButton:hover#abonar_prestamo {
                 background-color: #FFD400;
             }
 
-            QPushButton:hover#eliminar_prestamo{
-                background-color: red;
-            }
-
-            QPushButton:hover#editar_prestamo{
+            QPushButton:hover#verSoli_prestamo {
                 background-color: gold;
             }
 
+            QPushButton:hover#eliminar_prestamo {
+                background-color: red;
+            }
 
+            QPushButton:hover#editar_prestamo {
+                background-color: gold;
+            }
         """)
 
         central_widget = QWidget()
@@ -133,20 +182,41 @@ class AdminWindow(QMainWindow):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
 
+        # =====================================================
+        # ENCABEZADO
+        # =====================================================
+
+        encabezado = QWidget()
+        encabezado.setObjectName("encabezado")
+
+        encabezadoLayout = QHBoxLayout(encabezado)
+        encabezadoLayout.setContentsMargins(20, 12, 20, 12)
+
+        tituloPanel = QLabel("PANEL ADMINISTRADOR")
+        tituloPanel.setObjectName("tituloPanel")
+
+        infoUsuario = QLabel(self.usuario)
+        infoUsuario.setObjectName("infoUsuario")
+
+        encabezadoLayout.addWidget(tituloPanel)
+        encabezadoLayout.addStretch()
+        encabezadoLayout.addWidget(infoUsuario)
+
+        layout.addWidget(encabezado, 0, 0, 1, 2)
+
+        # =====================================================
         # LADO IZQUIERDO - CLIENTES
-        # CAMBIO: ahora creamos un panel propio para los clientes
+        # =====================================================
+
         panelClientes = QWidget()
         panelClientes.setObjectName("panelClientes")
 
-        # CAMBIO: layout propio para el panel izquierdo
         clientesLayout = QVBoxLayout(panelClientes)
 
         clientesTitulo = QLabel("Clientes")
         clientesLayout.addWidget(clientesTitulo)
 
         self.listaClientes = QListWidget()
-
-        # Cuando seleccionemos un cliente, mostramos sus datos
         self.listaClientes.itemClicked.connect(self.mostrarCliente)
 
         for cliente in self.clientes:
@@ -154,10 +224,8 @@ class AdminWindow(QMainWindow):
 
         clientesLayout.addWidget(self.listaClientes)
 
-        #botones pa horizontal xd
         botonesLayout = QHBoxLayout()
 
-        # CAMBIO: botones del panel izquierdo
         self.btnCreate = QPushButton("Crear Cliente")
         self.btnCreate.setObjectName("crear_cliente")
 
@@ -170,49 +238,53 @@ class AdminWindow(QMainWindow):
         self.btnCreate.clicked.connect(self.crearCl)
         self.btnCerrar.clicked.connect(self.btnCerrSes)
 
-        # CAMBIO: los botones se agregan al layout del panel izquierdo
-        # y NO al layout principal
         botonesLayout.addWidget(self.btnCreate)
         botonesLayout.addWidget(self.btnDelete)
         botonesLayout.addWidget(self.btnCerrar)
 
         clientesLayout.addLayout(botonesLayout)
 
-        # CAMBIO: agregamos el panel completo al Grid
-        layout.addWidget(panelClientes, 0, 0)
+        layout.addWidget(panelClientes, 1, 0)
 
-        
+        # =====================================================
         # LADO DERECHO - PRÉSTAMOS
+        # =====================================================
+
         panelPrestamos = QWidget()
         panelPrestamos.setObjectName("panelPrestamos")
 
         prestamosLayout = QVBoxLayout(panelPrestamos)
+
         botonesLayout2 = QHBoxLayout()
 
         prestamosTitulo = QLabel("Préstamos del cliente")
         prestamosLayout.addWidget(prestamosTitulo)
 
-        # Datos del cliente seleccionado
         self.lblCliente = QLabel("Seleccione un cliente")
+        self.lblCliente.setObjectName("lblCliente")
+
         self.lblCorreo = QLabel("Correo: -")
+        self.lblCorreo.setObjectName("lblCorreo")
+
+        self.btnVerSolicitudes = QPushButton("Ver Solicitudes")
+        self.btnVerSolicitudes.setObjectName("verSoli_prestamo")
 
         prestamosLayout.addWidget(self.lblCliente)
         prestamosLayout.addWidget(self.lblCorreo)
 
-        # CAMBIO: tabla para los préstamos
-        # Todavía no tiene datos, solamente la estructura
         self.tablaPrestamos = QTableWidget()
 
         self.tablaPrestamos.setColumnCount(4)
+
         self.tablaPrestamos.setHorizontalHeaderLabels([
             "ID",
             "Monto",
             "Plazo",
             "Estado"
         ])
+
         self.tablaPrestamos.setObjectName("tablaPrestamos")
 
-        # Ejemplo temporal
         self.tablaPrestamos.setRowCount(1)
 
         self.tablaPrestamos.setItem(
@@ -231,55 +303,51 @@ class AdminWindow(QMainWindow):
             0, 3, QTableWidgetItem("Activo")
         )
 
-        self.tablaPrestamos.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
         prestamosLayout.addWidget(self.tablaPrestamos, 1)
 
-        # CAMBIO: espacio que empuja el botón hacia abajo
         prestamosLayout.addStretch()
 
-        # Botón para crear préstamo
+        # BOTONES DE PRÉSTAMO
+
         self.btnCreatePrestamo = QPushButton("Crear Prestamo")
         self.btnCreatePrestamo.setObjectName("crear_prestamo")
 
         self.btnEditPrestamo = QPushButton("Editar Prestamo")
         self.btnEditPrestamo.setObjectName("editar_prestamo")
 
-
         self.btnAbonarPrestamo = QPushButton("Abonar Prestamo")
         self.btnAbonarPrestamo.setObjectName("abonar_prestamo")
 
-        self.btnEliminarPrestamo = QPushButton("Eliminar Prestamo") 
+        self.btnEliminarPrestamo = QPushButton("Eliminar Prestamo")
         self.btnEliminarPrestamo.setObjectName("eliminar_prestamo")
-
 
         botonesLayout2.addWidget(self.btnCreatePrestamo)
         botonesLayout2.addWidget(self.btnEditPrestamo)
         botonesLayout2.addWidget(self.btnAbonarPrestamo)
+        botonesLayout2.addWidget(self.btnVerSolicitudes)
         botonesLayout2.addWidget(self.btnEliminarPrestamo)
 
         prestamosLayout.addLayout(botonesLayout2)
 
-        # CAMBIO: agregamos el panel derecho al Grid
-        layout.addWidget(panelPrestamos, 0, 1)
+        layout.addWidget(panelPrestamos, 1, 1)
 
-        # TAMAÑO DE LAS COLUMNAS
-        # CAMBIO: la izquierda ocupa 1 parte
-        # y la derecha 3 partes
+        # PROPORCIONES
+
         layout.setColumnStretch(0, 1)
         layout.setColumnStretch(1, 3)
 
-        # CAMBIO: las dos zonas ocupan toda la altura disponible
-        layout.setRowStretch(0, 1)
-
+        layout.setRowStretch(0, 0)
+        layout.setRowStretch(1, 1)
 
     def mostrarCliente(self, item):
-
         nombre = item.text()
 
         for cliente in self.clientes:
-
             if cliente["nombre"] == nombre:
-
                 self.lblCliente.setText(
                     f"Cliente: {cliente['nombre']}"
                 )
@@ -290,33 +358,25 @@ class AdminWindow(QMainWindow):
 
                 return
 
-    # ==============================================================
-    # BOTÓN CREAR CLIENTE
-    # ==============================================================
-
-    def crearCl (self):
+    def crearCl(self):
         layoutCC = QWidget()
+
         layoutCC.setWindowTitle("Crear Cliente")
         layoutCC.resize(300, 200)
 
-        form_layout = QFormLayout(layoutCC)
-        form_layout.setObjectName("formCCl")
-        self.infoName = QLineEdit("")
-        self.infoName.setPlaceholderText("Ingresa tu nombre...")
-        self.infoName.setMaxLength(10)
+        layoutCC.setObjectName("formCC")
 
         layoutCC.setStyleSheet("""
-
-        #formCC{
+            #formCC {
                 background-color: #f5f5f5;
             }
 
-            QLineEdit{
+            QLineEdit {
                 background-color: #D3D3D3;
                 color: #000;
             }
 
-            QPushButton{
+            QPushButton {
                 background-color: #3B82F6;
                 color: white;
                 border: none;
@@ -326,24 +386,40 @@ class AdminWindow(QMainWindow):
                 font-weight: bold;
             }
 
-            QPushButton:hover{
+            QPushButton:hover {
                 background-color: green;
             }
-            """)
+        """)
+
+        form_layout = QFormLayout(layoutCC)
+
+        self.infoName = QLineEdit("")
+        self.infoName.setPlaceholderText(
+            "Ingresa tu nombre..."
+        )
+        self.infoName.setMaxLength(10)
 
         self.infoEmail = QLineEdit("")
-        self.infoEmail.setPlaceholderText("Ingresa tu correo electronico...")
+        self.infoEmail.setPlaceholderText(
+            "Ingresa tu correo electronico..."
+        )
 
         self.infoCedula = QLineEdit("")
-        self.infoCedula.setPlaceholderText("Ingresa tu cedula")
+        self.infoCedula.setPlaceholderText(
+            "Ingresa tu cedula"
+        )
         self.infoCedula.setMaxLength(16)
 
         self.infoPassword = QLineEdit("")
-        self.infoPassword.setPlaceholderText("Ingresa tu contraseña...")
+        self.infoPassword.setPlaceholderText(
+            "Ingresa tu contraseña..."
+        )
         self.infoPassword.setMaxLength(8)
 
         self.infoDir = QLineEdit("")
-        self.infoDir.setPlaceholderText("Ingresa tu direccion...")
+        self.infoDir.setPlaceholderText(
+            "Ingresa tu direccion..."
+        )
         self.infoDir.setMaxLength(40)
 
         self.btnEnviar = QPushButton("Enviar")
@@ -355,15 +431,14 @@ class AdminWindow(QMainWindow):
         form_layout.addWidget(self.infoEmail)
         form_layout.addWidget(self.infoPassword)
         form_layout.addWidget(self.infoDir)
-
         form_layout.addWidget(self.btnEnviar)
 
-
         layoutCC.show()
+
         self.ventanaCrear = layoutCC
 
     def enviarForm(self):
-        if(
+        if (
             not self.infoName.text().strip()
             or not self.infoCedula.text().strip()
             or not self.infoEmail.text().strip()
@@ -383,9 +458,18 @@ class AdminWindow(QMainWindow):
             "correo": self.infoEmail.text(),
             "password": self.infoPassword.text(),
             "direccion": self.infoDir.text()
-            }
+        }
 
         self.clientes.append(self.newCl)
+
+        # Actualiza la lista visual inmediatamente
+        self.listaClientes.addItem(
+            self.newCl["nombre"]
+        )
+
+        print(
+            f"Lista de clientes actualizada: {self.clientes}"
+        )
 
         QMessageBox.information(
             self,
@@ -396,21 +480,15 @@ class AdminWindow(QMainWindow):
         self.ventanaCrear.close()
 
     def btnCerrSes(self):
-        self.setStyleSheet("""
-            QMessageBox.information{
-            color: #fff;
-            }
-
-        """)
-
         QMessageBox.information(
             self,
             "Cerrando sesion",
             "Saliendo del sistema... :)"
-        ) 
-        
+        )
+
         self.ventana_login.input_user.clear()
         self.ventana_login.input_password.clear()
 
         self.close()
+
         self.ventana_login.showMaximized()

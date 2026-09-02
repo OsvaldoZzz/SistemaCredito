@@ -19,17 +19,61 @@ class ClienteWindow(QMainWindow):
                 background-color: #f5f6fa;
             }
 
+            /* ENCABEZADO */
+
+            QWidget#encabezado {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 10px;
+            }
+
+            QLabel#tituloPanel {
+                color: #1e293b;
+                font-size: 22px;
+                font-weight: bold;
+            }
+
+            QLabel#infoUsuario {
+                color: #64748b;
+                font-size: 16px;
+                font-weight: bold;
+            }
+
+            /* FRAME PRINCIPAL */
+
             QFrame#frameCliente {
                 background-color: white;
                 border: 1px solid #d1d5db;
                 border-radius: 15px;
             }
 
+            /* TITULOS */
+
             QLabel {
                 color: #1e293b;
                 font-size: 18px;
                 font-weight: bold;
             }
+
+            QLabel#lblNombre {
+                color: #1e293b;
+                font-size: 18px;
+                font-weight: bold;
+            }
+
+            QLabel#lblCorreo {
+                color: #64748b;
+                font-size: 14px;
+                font-weight: normal;
+            }
+
+            QLabel#tituloPrestamo {
+                color: #1e293b;
+                font-size: 20px;
+                font-weight: bold;
+            }
+
+            /* TABLA */
 
             QTableWidget {
                 background-color: white;
@@ -47,6 +91,8 @@ class ClienteWindow(QMainWindow):
                 border: none;
                 font-weight: bold;
             }
+
+            /* BOTONES */
 
             QPushButton {
                 background-color: #3B82F6;
@@ -73,19 +119,40 @@ class ClienteWindow(QMainWindow):
             QPushButton:hover#cerrar {
                 background-color: red;
             }
-
         """)
-
-        
 
         central = QWidget()
         self.setCentralWidget(central)
 
         layoutPrincipal = QVBoxLayout(central)
-        layoutPrincipal.setContentsMargins(30, 30, 30, 30)
+        layoutPrincipal.setContentsMargins(20, 20, 20, 20)
+        layoutPrincipal.setSpacing(20)
 
-    
+        # =====================================================
+        # ENCABEZADO
+        # =====================================================
+
+        encabezado = QWidget()
+        encabezado.setObjectName("encabezado")
+
+        encabezadoLayout = QHBoxLayout(encabezado)
+        encabezadoLayout.setContentsMargins(20, 12, 20, 12)
+
+        tituloPanel = QLabel("PANEL DEL CLIENTE")
+        tituloPanel.setObjectName("tituloPanel")
+
+        infoUsuario = QLabel(self.cliente["nombre"])
+        infoUsuario.setObjectName("infoUsuario")
+
+        encabezadoLayout.addWidget(tituloPanel)
+        encabezadoLayout.addStretch()
+        encabezadoLayout.addWidget(infoUsuario)
+
+        layoutPrincipal.addWidget(encabezado)
+
+        # =====================================================
         # FRAME PRINCIPAL
+        # =====================================================
 
         frame = QFrame()
         frame.setObjectName("frameCliente")
@@ -94,29 +161,34 @@ class ClienteWindow(QMainWindow):
         layoutFrame.setContentsMargins(30, 30, 30, 30)
         layoutFrame.setSpacing(15)
 
+        # INFORMACION DEL CLIENTE
 
-        titulo = QLabel("Panel del Cliente")
+        titulo = QLabel("Información del cliente")
         layoutFrame.addWidget(titulo)
 
         self.lblNombre = QLabel(
             f"Nombre: {self.cliente['nombre']}"
         )
+        self.lblNombre.setObjectName("lblNombre")
 
         self.lblCorreo = QLabel(
             f"Correo: {self.cliente['correo']}"
         )
+        self.lblCorreo.setObjectName("lblCorreo")
 
         layoutFrame.addWidget(self.lblNombre)
         layoutFrame.addWidget(self.lblCorreo)
 
-
+        # PRESTAMO
 
         tituloPrestamo = QLabel("Mi Préstamo")
+        tituloPrestamo.setObjectName("tituloPrestamo")
+
         layoutFrame.addWidget(tituloPrestamo)
 
-
+        # =====================================================
         # TABLA DE PRÉSTAMOS
-        
+        # =====================================================
 
         self.tablaPrestamos = QTableWidget()
 
@@ -130,6 +202,7 @@ class ClienteWindow(QMainWindow):
         ])
 
         # Ejemplo temporal
+
         self.tablaPrestamos.setRowCount(1)
 
         self.tablaPrestamos.setItem(
@@ -148,7 +221,6 @@ class ClienteWindow(QMainWindow):
             0, 3, QTableWidgetItem("Activo")
         )
 
-        # Ajustar columnas al espacio disponible
         self.tablaPrestamos.horizontalHeader().setStretchLastSection(True)
 
         self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
@@ -157,8 +229,11 @@ class ClienteWindow(QMainWindow):
 
         layoutFrame.addWidget(self.tablaPrestamos)
 
-
         layoutFrame.addStretch()
+
+        # =====================================================
+        # BOTONES
+        # =====================================================
 
         botonesLayout = QHBoxLayout()
 
@@ -172,7 +247,6 @@ class ClienteWindow(QMainWindow):
         self.btnCerrar.clicked.connect(self.btnCerrSes)
         self.btnCerrar.setObjectName("cerrar")
 
-
         botonesLayout.addWidget(self.btnSoli)
         botonesLayout.addWidget(self.btnAbonar)
         botonesLayout.addWidget(self.btnCerrar)
@@ -183,19 +257,14 @@ class ClienteWindow(QMainWindow):
 
     def btnCerrSes(self):
 
-        self.setStyleSheet("""
-            QMessageBox.information{
-            color: #fff;
-            }
-
-        """)
-
         QMessageBox.information(
             self,
             "Cerrando sesion",
             "Saliendo del sistema... :)"
         )
+
         self.ventana_login.input_user.clear()
         self.ventana_login.input_password.clear()
+
         self.close()
         self.ventana_login.showMaximized()

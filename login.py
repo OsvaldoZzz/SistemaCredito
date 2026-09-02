@@ -18,7 +18,7 @@ class login(QMainWindow):
             {"rol": "administrador","usuario": "Celia", "password": "87253629"},
             {"rol": "administrador","usuario": "Ariel", "password": "89268598"},
             {"rol": "recepcionista","usuario": "Trabajador1", "password": "12345678"},
-            {"rol": "recepcionista","usuario": "Trabajador2", "password": "12345678"},
+            {"rol": "recepcionista","usuario": "Trabajador2", "password": "12345678"}
         ]
 
 
@@ -145,16 +145,12 @@ class login(QMainWindow):
         self.btnIni.clicked.connect(self.iniciarSesion)
         self.btnIni.setObjectName("IniciarSe")
 
-        self.btnCrear = QPushButton("Crear Cliente")
-        self.btnCrear.setObjectName("crear")
-        self.btnCrear.clicked.connect(self.crearCl)
 
 
         layout.addWidget(self.logo)
         layout.addWidget(self.input_user)
         layout.addWidget(self.input_password)
         botones_layout.addWidget(self.btnIni)
-        botones_layout.addWidget(self.btnCrear)
         layout.addLayout(botones_layout)
 
     def iniciarSesion(self):
@@ -227,116 +223,6 @@ class login(QMainWindow):
                 F"Correo o contraseña incorrecta.\n"
                 f"Te quedan {restantes} intentos."
             )
-
-    def crearCl (self):
-        logo_path = Path(__file__).resolve().parent / "img" / "logoBG.png"
-        self.setWindowIcon(QIcon(str(logo_path)))
-
-        layoutCC = QWidget()
-        layoutCC.setWindowTitle("Crear Cliente")
-        layoutCC.resize(300, 200)
-        
-        
-        layoutCC.setObjectName("formCC")
-
-        layoutCC.setStyleSheet("""
-
-            #formCC{
-                background-color: #f5f5f5;
-            }
-
-            QLineEdit{
-                background-color: #D3D3D3;
-                color: #000;
-            }
-
-            QPushButton{
-                background-color: #3B82F6;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 10px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-
-            QPushButton:hover{
-                background-color: green;
-            }
-
-        """)
-
-        form_layout = QFormLayout(layoutCC)
-
-        self.infoName = QLineEdit("")
-        self.infoName.setPlaceholderText("Ingresa tu nombre...")
-        self.infoName.setMaxLength(10)
-
-        self.infoEmail = QLineEdit("")
-        self.infoEmail.setPlaceholderText("Ingresa tu correo electronico...")
-
-        self.infoCedula = QLineEdit("")
-        self.infoCedula.setPlaceholderText("Ingresa tu cedula")
-        self.infoCedula.setMaxLength(16)
-
-        self.infoPassword = QLineEdit("")
-        self.infoPassword.setPlaceholderText("Ingresa tu contraseña...")
-        self.infoPassword.setMaxLength(8)
-
-        self.infoDir = QLineEdit("")
-        self.infoDir.setPlaceholderText("Ingresa tu direccion...")
-        self.infoDir.setMaxLength(40)
-
-        self.btnEnviar = QPushButton("Enviar")
-        self.btnEnviar.clicked.connect(self.enviarForm)
-        self.btnEnviar.setObjectName("btnEnviar")
-
-        form_layout.addWidget(self.infoName)
-        form_layout.addWidget(self.infoCedula)
-        form_layout.addWidget(self.infoEmail)
-        form_layout.addWidget(self.infoPassword)
-        form_layout.addWidget(self.infoDir)
-
-        form_layout.addWidget(self.btnEnviar)
-
-
-        layoutCC.show()
-        self.ventanaCrear = layoutCC
-
-    def enviarForm(self):
-        if(
-            not self.infoName.text().strip()
-            or not self.infoCedula.text().strip()
-            or not self.infoEmail.text().strip()
-            or not self.infoPassword.text().strip()
-            or not self.infoDir.text().strip()
-        ):
-            QMessageBox.warning(
-                self,
-                "Campos Vacios",
-                "Debes llenar todos los campos."
-            )
-            return
-
-        self.newCl = {
-            "nombre": self.infoName.text(),
-            "cedula": self.infoCedula.text(),
-            "correo": self.infoEmail.text(),
-            "password": self.infoPassword.text(),
-            "direccion": self.infoDir.text()
-            }
-
-        self.clientes.append(self.newCl)
-        print(f"Lista de clientes actualizada: {self.clientes}")
-
-        QMessageBox.information(
-            self,
-            "Cliente creado",
-            "El cliente se creo correctamente."
-        )
-
-        self.ventanaCrear.close()
-
         
 
 if __name__ == "__main__":
