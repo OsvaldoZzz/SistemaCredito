@@ -4,10 +4,11 @@ from PySide6.QtGui import QIcon
 
 class ClienteWindow(QMainWindow):
 
-    def __init__(self, cliente):
+    def __init__(self, cliente, ventana_login):
         super().__init__()
 
         self.cliente = cliente
+        self.ventana_login = ventana_login
 
         self.setWindowTitle("Panel del Cliente")
         self.setWindowIcon(QIcon("img/logoBG.png"))
@@ -168,6 +169,7 @@ class ClienteWindow(QMainWindow):
         self.btnAbonar.setObjectName("abonar")
 
         self.btnCerrar = QPushButton("Cerrar Sesión")
+        self.btnCerrar.clicked.connect(self.btnCerrSes)
         self.btnCerrar.setObjectName("cerrar")
 
 
@@ -178,3 +180,22 @@ class ClienteWindow(QMainWindow):
         layoutFrame.addLayout(botonesLayout)
 
         layoutPrincipal.addWidget(frame)
+
+    def btnCerrSes(self):
+
+        self.setStyleSheet("""
+            QMessageBox.information{
+            color: #fff;
+            }
+
+        """)
+
+        QMessageBox.information(
+            self,
+            "Cerrando sesion",
+            "Saliendo del sistema... :)"
+        )
+        self.ventana_login.input_user.clear()
+        self.ventana_login.input_password.clear()
+        self.close()
+        self.ventana_login.showMaximized()

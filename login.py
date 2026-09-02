@@ -36,7 +36,7 @@ class login(QMainWindow):
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #F5F5F5;
-            }
+            }    
 
             #frame1 {
                 background-color: #D3D3D3;
@@ -48,6 +48,7 @@ class login(QMainWindow):
             #logo {
                 background-color: transparent;
             }
+
 
             QLineEdit {
                 background-color: #D3D3D3;
@@ -95,6 +96,7 @@ class login(QMainWindow):
             QPushButton:hover#crear{
                 background-color: gold;
             }
+
 
         """)
 
@@ -155,6 +157,7 @@ class login(QMainWindow):
         usuario = self.input_user.text()
         password = self.input_password.text()
         correo = self.input_user.text()
+        print(f"Correo user ingresado: {correo}, Contraseña ingresada: {password}")
 
         if len(password) != 8:
             QMessageBox.warning(
@@ -186,9 +189,9 @@ class login(QMainWindow):
                     "Inicio de sesion como cliente exitosa."
                 )
 
-                self.ventana_cliente = ClienteWindow(cliente)
+                self.ventana_cliente = ClienteWindow(cliente, ventana_login=self)
                 self.ventana_cliente.show()
-                self.close
+                self.close()
                 return
 
         
@@ -215,12 +218,45 @@ class login(QMainWindow):
             )
 
     def crearCl (self):
+        logo_path = Path(__file__).resolve().parent / "img" / "logoBG.png"
+        self.setWindowIcon(QIcon(str(logo_path)))
+
         layoutCC = QWidget()
         layoutCC.setWindowTitle("Crear Cliente")
         layoutCC.resize(300, 200)
+        
+        
+        layoutCC.setObjectName("formCC")
+
+        layoutCC.setStyleSheet("""
+
+            #formCC{
+                background-color: #f5f5f5;
+            }
+
+            QLineEdit{
+                background-color: #D3D3D3;
+                color: #000;
+            }
+
+            QPushButton{
+                background-color: #3B82F6;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+
+            QPushButton:hover{
+                background-color: green;
+            }
+
+        """)
 
         form_layout = QFormLayout(layoutCC)
-        form_layout.setObjectName("formCCl")
+
         self.infoName = QLineEdit("")
         self.infoName.setPlaceholderText("Ingresa tu nombre...")
         self.infoName.setMaxLength(10)
@@ -230,7 +266,7 @@ class login(QMainWindow):
 
         self.infoCedula = QLineEdit("")
         self.infoCedula.setPlaceholderText("Ingresa tu cedula")
-        self.infoCedula.setMaxLength(14)
+        self.infoCedula.setMaxLength(16)
 
         self.infoPassword = QLineEdit("")
         self.infoPassword.setPlaceholderText("Ingresa tu contraseña...")
@@ -271,21 +307,26 @@ class login(QMainWindow):
             )
             return
 
-        self.newCl = [{
+        self.newCl = {
             "nombre": self.infoName.text(),
             "cedula": self.infoCedula.text(),
             "correo": self.infoEmail.text(),
             "password": self.infoPassword.text(),
             "direccion": self.infoDir.text()
-            }]
+            }
 
         self.clientes.append(self.newCl)
+        print(f"Lista de clientes actualizada: {self.clientes}")
 
         QMessageBox.information(
             self,
             "Cliente creado",
             "El cliente se creo correctamente."
         )
+
+        self.ventanaCrear.close()
+
+        
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

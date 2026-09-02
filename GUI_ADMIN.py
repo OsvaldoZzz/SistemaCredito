@@ -305,6 +305,32 @@ class AdminWindow(QMainWindow):
         self.infoName.setPlaceholderText("Ingresa tu nombre...")
         self.infoName.setMaxLength(10)
 
+        layoutCC.setStyleSheet("""
+
+        #formCC{
+                background-color: #f5f5f5;
+            }
+
+            QLineEdit{
+                background-color: #D3D3D3;
+                color: #000;
+            }
+
+            QPushButton{
+                background-color: #3B82F6;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+
+            QPushButton:hover{
+                background-color: green;
+            }
+            """)
+
         self.infoEmail = QLineEdit("")
         self.infoEmail.setPlaceholderText("Ingresa tu correo electronico...")
 
@@ -370,7 +396,14 @@ class AdminWindow(QMainWindow):
         self.ventanaCrear.close()
 
     def btnCerrSes(self):
-        QMessageBox(
+        self.setStyleSheet("""
+            QMessageBox.information{
+            color: #fff;
+            }
+
+        """)
+
+        QMessageBox.information(
             self,
             "Cerrando sesion",
             "Saliendo del sistema... :)"
