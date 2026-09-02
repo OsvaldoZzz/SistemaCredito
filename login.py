@@ -2,6 +2,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QPixmap
 from GUI_ADMIN import AdminWindow
+from GUI_REC import RecepWindow
 from GUI_CLIENTE import ClienteWindow
 from pathlib import Path #
 import sys
@@ -12,11 +13,14 @@ class login(QMainWindow):
         super().__init__()
         self.setUpUi()
         self.usuarios = [
-            {"usuario": "Marvin" , "password": "12345678"},
-            {"usuario": "Yavar", "password": "84635922"},
-            {"usuario": "Celia", "password": "87253629"},
-            {"usuario": "Ariel", "password": "89268598"}
+            {"rol": "administrador","usuario": "Marvin" , "password": "12345678"},
+            {"rol": "administrador","usuario": "Yavar", "password": "84635922"},
+            {"rol": "administrador","usuario": "Celia", "password": "87253629"},
+            {"rol": "administrador","usuario": "Ariel", "password": "89268598"},
+            {"rol": "recepcionista","usuario": "Trabajador1", "password": "12345678"},
+            {"rol": "recepcionista","usuario": "Trabajador2", "password": "12345678"},
         ]
+
 
         self.clientes = [
             {"nombre": "Cliente 1", "cedula" : "281-123456-1000A", "correo": "ejemplo2@gmail.com", "password": "87654321", "direccion": "Iglesia San Isidro 1/2 cuadra bajo", "monto" : "1000"},
@@ -167,17 +171,24 @@ class login(QMainWindow):
             )
             return
         
-        for admin in self.usuarios:
-            if admin["usuario"] == usuario and admin["password"] == password:
+        for rol in self.usuarios:
+            if rol["usuario"] == usuario and rol["password"] == password:
                 QMessageBox.information(
                     self,
                     "Inicio de Sesion",
-                    "Inicio de sesion como administrador exitoso."
+                    "Inicio de sesion como " + rol["rol"] + " exitoso."
                 )
 
-                self.ventana_admin = AdminWindow(self.clientes, self)
-                self.ventana_admin.show()
-                self.close()
+                if rol["rol"] == "administrador":
+                    self.ventana_admin = AdminWindow(self.clientes, self)
+                    self.ventana_admin.show()
+                    self.hide()
+                elif rol["rol"] == "recepcionista":
+                    self.ventana_recep = RecepWindow(self.clientes, self)
+                    self.ventana_recep.show()
+                    self.hide() #esconde la ventana de login cuando se abre un nuevo panel
+
+                #self.close()
                 
                 return
 
