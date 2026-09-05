@@ -65,6 +65,13 @@ class RecepWindow(QMainWindow):
                 font-weight: normal;
             }
 
+            QLabel#lblDir {
+                margin-bottom: 5px;
+                color: #64748b;
+                font-size: 14px;
+                font-weight: normal;
+            }
+
             /* LISTA DE CLIENTES */
 
             QListWidget {
@@ -155,6 +162,10 @@ class RecepWindow(QMainWindow):
             QPushButton:hover#abonar_prestamo {
                 background-color: gold;
             }
+
+            QPushButton:hover#verCitas {
+                background-color: #8B4513;
+            }
         """)
 
         central_widget = QWidget()
@@ -205,7 +216,7 @@ class RecepWindow(QMainWindow):
         )
 
         for cliente in self.clientes:
-            self.listaClientes.addItem(cliente["nombre"])
+            self.listaClientes.addItem(cliente["nombre"] + " - " + cliente["cedula"])
 
         clientesLayout.addWidget(self.listaClientes)
 
@@ -249,8 +260,12 @@ class RecepWindow(QMainWindow):
         self.lblCorreo = QLabel("Correo: -")
         self.lblCorreo.setObjectName("lblCorreo")
 
+        self.lblDir = QLabel("Direccion: -")
+        self.lblDir.setObjectName("lblDir")
+
         prestamosLayout.addWidget(self.lblCliente)
         prestamosLayout.addWidget(self.lblCorreo)
+        prestamosLayout.addWidget(self.lblDir)
 
         # =====================================================
         # TABLA DE PRÉSTAMOS
@@ -304,10 +319,14 @@ class RecepWindow(QMainWindow):
         # BOTONES DE PRÉSTAMO
         # =====================================================
 
+
         self.btnSoliPrestamo = QPushButton("Solicitar Prestamo")
         self.btnSoliPrestamo.setObjectName(
             "solicitar_prestamo"
         )
+
+        self.btnVerCitas = QPushButton("Ver Citas")
+        self.btnVerCitas.setObjectName("verCitas")
 
         self.btnAbonarPrestamo = QPushButton("Abonar Prestamo")
         self.btnAbonarPrestamo.setObjectName(
@@ -321,6 +340,8 @@ class RecepWindow(QMainWindow):
         botonesLayout2.addWidget(
             self.btnAbonarPrestamo
         )
+
+        botonesLayout2.addWidget(self.btnVerCitas)
 
         prestamosLayout.addLayout(
             botonesLayout2
@@ -343,22 +364,23 @@ class RecepWindow(QMainWindow):
         layout.setRowStretch(1, 1)
 
     def mostrarCliente(self, item):
+        indice_cliente = self.listaClientes.row(item) # obtiene el indice del cliente seleccionado
+        if indice_cliente < 0 or indice_cliente >= len(self.clientes):
+            return
+        
+        cliente = self.clientes[indice_cliente]
 
-        nombre = item.text()
 
-        for cliente in self.clientes:
-
-            if cliente["nombre"] == nombre:
-
-                self.lblCliente.setText(
-                    f"Cliente: {cliente['nombre']}"
-                )
-
-                self.lblCorreo.setText(
-                    f"Correo: {cliente['correo']}"
-                )
-
-                return
+        self.lblCliente.setText(
+            f"Cliente: {cliente['nombre']}"
+        )
+        self.lblCorreo.setText(
+            f"Correo: {cliente['correo']}"
+        )
+        self.lblDir.setText(
+            f"Direccion: {cliente['direccion']}"
+        )
+        return
 
     # ==========================================================
     # BOTÓN CREAR CLIENTE

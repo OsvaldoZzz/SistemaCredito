@@ -1,6 +1,11 @@
 #se usara para la opcion de crear clientes
 QStackedLayout() este es para mostrar uno a la vez, tipo un modal
 
+=============================================
+Apartado para crear boton dentro de una tabla
+==============================================
+
+
 ==========================================
 Apartado pa crear clientes.
 ==========================================
@@ -121,3 +126,14 @@ Apartado pa crear clientes.
 ===============================
 Color verde jade: #00BB77
 Color celestito: #3B82F6
+
+============================
+        Botones
+============================
+
+        self.btnEditPrestamo = QPushButton("Editar Prestamo")
+        self.btnEditPrestamo.setObjectName("editar_prestamo")
+
+        self.btnEliminarPrestamo = QPushButton("Eliminar Prestamo")
+        self.btnEliminarPrestamo.setObjectName("eliminar_prestamo")
+

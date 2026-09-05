@@ -108,12 +108,8 @@ class ClienteWindow(QMainWindow):
                 background-color: #2563eb;
             }
 
-            QPushButton:hover#solicitud {
+            QPushButton:hover#agendar {
                 background-color: green;
-            }
-
-            QPushButton:hover#abonar {
-                background-color: gold;
             }
 
             QPushButton:hover#cerrar {
@@ -237,23 +233,23 @@ class ClienteWindow(QMainWindow):
 
         botonesLayout = QHBoxLayout()
 
-        self.btnSoli = QPushButton("Solicitar Prestamo")
-        self.btnSoli.setObjectName("solicitud")
-
-        self.btnAbonar = QPushButton("Abonar Prestamo")
-        self.btnAbonar.setObjectName("abonar")
+        self.btnAgendar = QPushButton("Agendar cita")
+        #self.btnAgendar.clicked.connect(self.btnAgendar)
+        self.btnAgendar.setObjectName("agendar")
 
         self.btnCerrar = QPushButton("Cerrar Sesión")
         self.btnCerrar.clicked.connect(self.btnCerrSes)
         self.btnCerrar.setObjectName("cerrar")
 
-        botonesLayout.addWidget(self.btnSoli)
-        botonesLayout.addWidget(self.btnAbonar)
+        botonesLayout.addWidget(self.btnAgendar)
         botonesLayout.addWidget(self.btnCerrar)
 
         layoutFrame.addLayout(botonesLayout)
 
         layoutPrincipal.addWidget(frame)
+
+    def btnAgendar(self):
+        pass
 
     def btnCerrSes(self):
 
