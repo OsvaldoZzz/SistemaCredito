@@ -25,8 +25,8 @@ class login(QMainWindow):
         ]
 
         self.clientes = [
-            {"nombre": "Cliente 1", "cedula" : "2811234561000A", "correo": "ejemplo2@gmail.com", "password": "87654321", "direccion": "Iglesia San Isidro 1/2 cuadra bajo", "monto" : "1000"},
-            {"nombre": "Cliente 2", "cedula" : "2811234561007W", "correo": "ejemplo@gmail.com", "password": "12345678", "direccion": "Iglesia San Isidro 2 cuadra bajo", "monto": "20000"}
+            {"id":"001","nombre": "Cliente 1", "cedula" : "2811234561000A", "correo": "ejemplo2@gmail.com", "password": "87654321", "direccion": "Iglesia San Isidro 1/2 cuadra bajo", "monto" : "1000"},
+            {"id":"002","nombre": "Cliente 2", "cedula" : "2811234561007W", "correo": "ejemplo@gmail.com", "password": "12345678", "direccion": "Iglesia San Isidro 2 cuadra bajo", "monto": "20000"}
         ]
 
         self.intentosLogIn = 0

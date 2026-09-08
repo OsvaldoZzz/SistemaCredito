@@ -181,7 +181,7 @@ class AdminWindow(QMainWindow):
             }
 
             QPushButton:hover#verSoli_prestamo {
-                background-color: gold;
+                background-color: gray;
             }
 
             QPushButton:hover#eliminar_prestamo {
@@ -689,6 +689,7 @@ class AdminWindow(QMainWindow):
         dialogo.setModal(True)
 
         formulario = QFormLayout(dialogo)
+        formulario.setObjectName("LayoutFEDIT")
 
         monto_input = QLineEdit(monto_item.text())
         plazo_input = QLineEdit(plazo_item.text())
