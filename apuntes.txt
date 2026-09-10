@@ -144,3 +144,6 @@ Color celestito: #3B82F6
         self.btnEliminarPrestamo = QPushButton("Eliminar Prestamo")
         self.btnEliminarPrestamo.setObjectName("eliminar_prestamo")
 
+def buscarCliente(self):
+    for clientesBuscar == clientes[cedula]:
+    

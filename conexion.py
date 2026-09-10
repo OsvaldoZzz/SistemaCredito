@@ -1,32 +1,15 @@
+import os
+
 import mysql.connector
-from mysql.connector import errorcode
+from mysql.connector import MySQLConnection
 
-conexion = None
 
-try:
-    conexion = mysql.connector.connect(
-        host="localhost",
-        port=3306,
-        user="roor",
-        password= "familia4214",
-        database="db_sistema_prestamos"
+def obtener_conexion() -> MySQLConnection:
+    """Abre una conexión nueva para una operación de base de datos."""
+    return mysql.connector.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", "3306")),
+        user=os.getenv("DB_USER", "root"),
+        password=os.getenv("DB_PASSWORD", ""),
+        database=os.getenv("DB_NAME", "db_sistema_prestamos"),
     )
-
-    if conexion.is_connected():
-        print("Conexion estable.")
-
-except mysql.connector.Error as err:
-    if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-        print("Error de autenticacion: usuario o contraseña incorrectos.")
-    elif err.errno == errorcode.ER_BAD_DB_ERROR: 
-        print("ERROR: La base de datos no existe.")
-    else:
-        print(f"Error imprevisto de base de datos: {err}")
-
-finally:
-    if conexion is not None and conexion.is_connected():
-        conexion.close()
-        print("Conexion cerrada de forma segura. :)")
-
-
-
