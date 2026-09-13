@@ -1,0 +1,98 @@
+RESUMEN DE CAMBIOS REALIZADOS
+=============================
+
+1. Panel de recepcionista
+--------------------------
+- Se agrego un buscador de clientes por cedula.
+- La busqueda puede ejecutarse con el boton de lupa o presionando Enter.
+- Se corrigio la seleccion del cliente cuando la lista esta filtrada.
+- Se activo el boton Solicitar Prestamo.
+- Se activo el boton Abonar Prestamo.
+- Se activo el boton Ver Citas.
+- La lista de clientes se actualiza despues de crear un cliente.
+- Se bloqueo la edicion directa de las celdas de la tabla de prestamos.
+- Se agrego estilo QSS para los QMessageBox.
+
+2. Panel de cobrador
+--------------------
+- Se agrego el buscador de clientes por cedula.
+- Se agrego la busqueda con boton de lupa y tecla Enter.
+- Se corrigio la seleccion del cliente filtrado.
+- Se activo el boton Abonar Prestamo.
+- Se mantuvo funcional el boton Cerrar Sesion.
+- Se bloqueo la edicion directa de la tabla de prestamos.
+- Se agrego estilo QSS para los QMessageBox.
+
+3. Panel de administrador
+-------------------------
+- Se conecto el buscador de clientes existente.
+- Se conservaron los indices originales de los clientes filtrados.
+- Se conectaron las acciones de clientes y prestamos.
+- Se agregaron botones para generar:
+  - Reporte de cartera en PDF.
+  - Reporte de cobranza en PDF.
+- Los reportes muestran errores de forma explicita.
+
+4. Reportes PDF
+---------------
+- Se agrego el modulo reportes_pdf.py.
+- Se implemento la generacion del estado de cartera.
+- Se implemento la generacion del reporte financiero de cobranza.
+- Se implemento la generacion de recibos de pago.
+- Se agrego la dependencia reportlab.
+
+5. Conexion con MySQL
+---------------------
+- Se conecto la carga inicial de clientes desde MySQL.
+- Se conecto la creacion de clientes con la tabla clientes.
+- Se conecto la eliminacion de clientes desde el panel administrador.
+- Se agrego manejo de errores de conexion y operaciones de base de datos.
+- La conexion usa variables de entorno:
+  DB_HOST, DB_PORT, DB_USER, DB_PASSWORD y DB_NAME.
+- Se elimino la contrasena real del archivo de conexion.
+
+6. Persistencia de prestamos
+----------------------------
+- Se creo el modulo prestamos_crud.py.
+- Se implemento listar_prestamos por cliente.
+- Se implemento crear_prestamo.
+- El panel administrador carga los prestamos desde MySQL.
+- Los nuevos prestamos se guardan en MySQL.
+- Recepcionista y cobrador cargan los prestamos desde MySQL.
+- Se mantiene la relacion entre prestamo y clientes mediante cliente_id.
+
+7. Base de datos
+----------------
+- La base de datos utilizada es db_sistema_prestamos.
+- La tabla clientes debe tener:
+  id, nombre, correo, password, cedula, direccion y monto.
+- La tabla prestamo debe tener:
+  id, cliente_id, monto, plazo y estado.
+- La tabla prestamo debe usar una llave foranea hacia clientes(id).
+- Se corrigieron conflictos causados por columnas antiguas con tildes:
+  contraseña y dirección.
+- Se corrigieron conflictos de nombres de usuarios y restricciones
+  de llaves foraneas.
+
+8. Validaciones realizadas
+--------------------------
+- Se verifico la sintaxis de los archivos Python modificados.
+- Se verifico el formato del diff.
+- Se verifico la importacion de los modulos principales.
+- Se probaron las consultas de conexion y se detectaron errores de
+  estructura de tablas para corregirlos en MySQL.
+
+9. Configuracion antes de ejecutar
+----------------------------------
+Configurar en PowerShell:
+
+  $env:DB_HOST="localhost"
+  $env:DB_PORT="3306"
+  $env:DB_USER="root"
+  $env:DB_PASSWORD="TU_CONTRASENA_MYSQL"
+  $env:DB_NAME="db_sistema_prestamos"
+
+Ejecutar desde la carpeta del proyecto:
+
+  python LOGIN.py
+
