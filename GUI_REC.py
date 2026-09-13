@@ -1,6 +1,9 @@
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
+from clientes_crud import crear_cliente
+from prestamos_crud import listar_prestamos
 
 
 class RecepWindow(QMainWindow):
@@ -70,6 +73,18 @@ class RecepWindow(QMainWindow):
                 color: #64748b;
                 font-size: 14px;
                 font-weight: normal;
+            }
+
+            QLineEdit#lineaEdit {
+                background-color: #f5f5f5;
+                border: 1px solid #d1d5db;
+                border-radius: 8px;
+                padding: 5px;
+                color: #000;
+            }
+
+            QPushButton#btnBuscar {
+                padding: 5px;
             }
 
             /* LISTA DE CLIENTES */
@@ -166,6 +181,32 @@ class RecepWindow(QMainWindow):
             QPushButton:hover#verCitas {
                 background-color: #8B4513;
             }
+
+            QMessageBox {
+                background-color: #f5f5f5;
+                color: #000;
+            }
+
+            QMessageBox QLabel {
+                color: #000;
+                font-size: 14px;
+                font-weight: normal;
+            }
+
+            QMessageBox QPushButton {
+                background-color: #3B82F6;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px;
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+
+            QMessageBox QPushButton:hover {
+                background-color: green;
+            }
         """)
 
         central_widget = QWidget()
@@ -209,14 +250,36 @@ class RecepWindow(QMainWindow):
         clientesTitulo = QLabel("Clientes")
         clientesLayout.addWidget(clientesTitulo)
 
+        #============================
+            #Buscar clientes.
+        #============================
+        self.buscarCl = QHBoxLayout()
+
+        self.clientesBuscar = QLineEdit()
+        self.clientesBuscar.setPlaceholderText("Ingresar cedula a buscar...")
+        self.clientesBuscar.setObjectName("lineaEdit")
+        self.clientesBuscar.returnPressed.connect(self.buscarCliente)
+
+
+        self.btnBuscar = QPushButton()
+        self.btnBuscar.setObjectName("btnBuscar")
+        self.btnBuscar.setIcon(QIcon("img/lupa.png"))
+        self.btnBuscar.setIconSize(QSize(24, 24))
+        self.btnBuscar.clicked.connect(self.buscarCliente)
+
+        #corregir para que aparezca en la parte de al lado de cliente, y darle qss al boton buscar
+        self.buscarCl.addWidget(self.clientesBuscar)
+        self.buscarCl.addWidget(self.btnBuscar)
+
+        clientesLayout.addLayout(self.buscarCl)
+
         self.listaClientes = QListWidget()
 
         self.listaClientes.itemClicked.connect(
             self.mostrarCliente
         )
 
-        for cliente in self.clientes:
-            self.listaClientes.addItem(cliente["nombre"] + " - " + cliente["cedula"])
+        self.cargarListaClientes()
 
         clientesLayout.addWidget(self.listaClientes)
 
@@ -274,6 +337,12 @@ class RecepWindow(QMainWindow):
         self.tablaPrestamos = QTableWidget()
 
         self.tablaPrestamos.setColumnCount(4)
+        self.tablaPrestamos.setEditTriggers(
+            QAbstractItemView.NoEditTriggers
+        )
+        self.tablaPrestamos.setSelectionBehavior(
+            QAbstractItemView.SelectRows
+        )
 
         self.tablaPrestamos.setHorizontalHeaderLabels([
             "ID",
@@ -328,10 +397,14 @@ class RecepWindow(QMainWindow):
         self.btnVerCitas = QPushButton("Ver Citas")
         self.btnVerCitas.setObjectName("verCitas")
 
+        self.btnSoliPrestamo.clicked.connect(self.solicitarPrestamo)
+        self.btnVerCitas.clicked.connect(self.verCitas)
+
         self.btnAbonarPrestamo = QPushButton("Abonar Prestamo")
         self.btnAbonarPrestamo.setObjectName(
             "abonar_prestamo"
         )
+        self.btnAbonarPrestamo.clicked.connect(self.abonarPrestamo)
 
         botonesLayout2.addWidget(
             self.btnSoliPrestamo
@@ -363,12 +436,46 @@ class RecepWindow(QMainWindow):
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 1)
 
+        if self.listaClientes.count() > 0:
+            self.listaClientes.setCurrentRow(0)
+            self.mostrarCliente(self.listaClientes.currentItem())
+
+    def cargarListaClientes(self):
+        self.listaClientes.clear()
+        for indice, cliente in enumerate(self.clientes):
+            item = QListWidgetItem(
+                cliente["nombre"] + " - " + cliente["cedula"]
+            )
+            item.setData(Qt.ItemDataRole.UserRole, indice)
+            self.listaClientes.addItem(item)
+
+    @staticmethod
+    def prestamosPredeterminados():
+        return [
+            {
+                "id": "001",
+                "monto": "C$20,000",
+                "plazo": "10 cuotas",
+                "estado": "Activo",
+            },
+            {
+                "id": "002",
+                "monto": "C$10,000",
+                "plazo": "5 cuotas",
+                "estado": "Activo",
+            },
+        ]
+
     def mostrarCliente(self, item):
-        indice_cliente = self.listaClientes.row(item) # obtiene el indice del cliente seleccionado
+        indice_cliente = item.data(Qt.ItemDataRole.UserRole)
+        if indice_cliente is None:
+            indice_cliente = self.listaClientes.row(item)
+
         if indice_cliente < 0 or indice_cliente >= len(self.clientes):
             return
         
         cliente = self.clientes[indice_cliente]
+        self.cargarPrestamosCliente(cliente)
 
 
         self.lblCliente.setText(
@@ -381,6 +488,35 @@ class RecepWindow(QMainWindow):
             f"Direccion: {cliente['direccion']}"
         )
         return
+
+    def cargarPrestamosCliente(self, cliente):
+        self.tablaPrestamos.setRowCount(0)
+        if cliente.get("id") is None:
+            return
+
+        try:
+            prestamos = listar_prestamos(int(cliente["id"]))
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al cargar prestamos",
+                f"No se pudieron cargar los prestamos: {error}"
+            )
+            return
+
+        for prestamo in prestamos:
+            fila = self.tablaPrestamos.rowCount()
+            self.tablaPrestamos.insertRow(fila)
+            valores = (
+                str(prestamo["id"]),
+                f"C$ {float(prestamo['monto']):,.2f}",
+                f"{prestamo['plazo']} cuotas",
+                prestamo["estado"],
+            )
+            for columna, valor in enumerate(valores):
+                self.tablaPrestamos.setItem(
+                    fila, columna, QTableWidgetItem(valor)
+                )
 
     # ==========================================================
     # BOTÓN CREAR CLIENTE
@@ -492,7 +628,25 @@ class RecepWindow(QMainWindow):
             "direccion": self.infoDir.text()
         }
 
+        try:
+            cliente_id = crear_cliente(
+                self.newCl["nombre"],
+                self.newCl["cedula"],
+                self.newCl["correo"],
+                self.newCl["password"],
+                self.newCl["direccion"]
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al crear cliente",
+                f"No se pudo guardar el cliente: {error}"
+            )
+            return
+
+        self.newCl["id"] = cliente_id
         self.clientes.append(self.newCl)
+        self.cargarListaClientes()
 
         QMessageBox.information(
             self,
@@ -501,6 +655,121 @@ class RecepWindow(QMainWindow):
         )
 
         self.ventanaCrear.close()
+
+    def buscarCliente(self):
+        cedula = self.clientesBuscar.text().strip().casefold()
+
+        self.listaClientes.clear()
+        encontrados = 0
+        for indice, cliente in enumerate(self.clientes):
+            if cedula and cedula not in cliente["cedula"].casefold():
+                continue
+
+            item = QListWidgetItem(
+                cliente["nombre"] + " - " + cliente["cedula"]
+            )
+            item.setData(Qt.ItemDataRole.UserRole, indice)
+            self.listaClientes.addItem(item)
+            encontrados += 1
+
+        if encontrados > 0:
+            self.listaClientes.setCurrentRow(0)
+            self.mostrarCliente(self.listaClientes.currentItem())
+
+        if cedula and encontrados == 0:
+            QMessageBox.information(
+                self,
+                "Cliente no encontrado",
+                f"No se encontro un cliente con la cedula {cedula}."
+            )
+
+    def clienteSeleccionado(self):
+        item = self.listaClientes.currentItem()
+        if item is None:
+            return None
+
+        indice = item.data(Qt.ItemDataRole.UserRole)
+        if indice is None or indice < 0 or indice >= len(self.clientes):
+            return None
+        return self.clientes[indice]
+
+    def solicitarPrestamo(self):
+        cliente = self.clienteSeleccionado()
+        if cliente is None:
+            QMessageBox.warning(
+                self,
+                "Cliente no seleccionado",
+                "Selecciona un cliente para solicitarle un prestamo."
+            )
+            return
+
+        monto, aceptado = QInputDialog.getText(
+            self,
+            "Solicitar prestamo",
+            f"Monto solicitado para {cliente['nombre']}:"
+        )
+        if not aceptado or not monto.strip():
+            return
+
+        QMessageBox.information(
+            self,
+            "Solicitud registrada",
+            f"La solicitud de prestamo por {monto.strip()} fue registrada."
+        )
+
+    def abonarPrestamo(self):
+        cliente = self.clienteSeleccionado()
+        fila = self.tablaPrestamos.currentRow()
+        if cliente is None:
+            QMessageBox.warning(
+                self,
+                "Cliente no seleccionado",
+                "Selecciona un cliente antes de registrar un abono."
+            )
+            return
+        if fila < 0:
+            QMessageBox.warning(
+                self,
+                "Prestamo no seleccionado",
+                "Selecciona un prestamo de la tabla para registrar un abono."
+            )
+            return
+
+        monto, aceptado = QInputDialog.getDouble(
+            self,
+            "Abonar prestamo",
+            "Monto del abono:",
+            0.0,
+            0.01,
+            100000000.0,
+            2
+        )
+        if not aceptado:
+            return
+
+        id_item = self.tablaPrestamos.item(fila, 0)
+        QMessageBox.information(
+            self,
+            "Abono registrado",
+            f"Se registro un abono de C$ {monto:,.2f} "
+            f"para el prestamo {id_item.text()} de {cliente['nombre']}."
+        )
+
+    def verCitas(self):
+        cliente = self.clienteSeleccionado()
+        if cliente is None:
+            QMessageBox.warning(
+                self,
+                "Cliente no seleccionado",
+                "Selecciona un cliente para ver sus citas."
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Citas",
+            f"No hay citas registradas para {cliente['nombre']}."
+        )
 
     def btnCerrSes(self):
 

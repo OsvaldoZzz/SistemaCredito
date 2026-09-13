@@ -1,6 +1,6 @@
 Pendientes: 07-09-26
 -> en la parte de acciones cambiar el ojito por un lapiz y una basurita (Crear un boton extra)
--> el qss para la parte de editar Prestamo
+-> el qss para la parte de editar Prestamo.
 -> borrar la opcion de escribir sobre la tabla.
--> agregar interes
--> agregar panelcito de buscar cliente
+-> agregar interes.
+-> agregar panelcito de buscar cliente.

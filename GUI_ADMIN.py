@@ -3,6 +3,9 @@ from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
 from pathlib import Path
+from reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
+from clientes_crud import crear_cliente, eliminar_cliente
+from prestamos_crud import listar_prestamos, crear_prestamo
 
 
 class AdminWindow(QMainWindow):
@@ -216,6 +219,10 @@ class AdminWindow(QMainWindow):
                 background-color: gray;
             }
 
+            QPushButton:hover#reporte_pdf {
+                background-color: #00BB77;
+            }
+
             QPushButton:hover#eliminar_prestamo {
                 background-color: red;
             }
@@ -313,6 +320,10 @@ class AdminWindow(QMainWindow):
         self.buscarCl.addWidget(self.btnBuscar)
 
         clientesLayout.addLayout(self.buscarCl)
+
+    #=====================================
+    #lista de clientes
+    #=====================================
 
         self.listaClientes = QListWidget()
         self.listaClientes.itemClicked.connect(self.mostrarCliente)
@@ -470,11 +481,19 @@ class AdminWindow(QMainWindow):
         self.btnAbonarPrestamo.setObjectName("abonar_prestamo")
         self.btnAbonarPrestamo.clicked.connect(self.abonarPrestamo)
 
+        self.btnReporteCartera = QPushButton("Reporte Cartera PDF")
+        self.btnReporteCartera.setObjectName("reporte_pdf")
+        self.btnReporteCartera.clicked.connect(self.generarReporteCartera)
+
+        self.btnReporteCobranza = QPushButton("Reporte Cobranza PDF")
+        self.btnReporteCobranza.setObjectName("reporte_pdf")
+        self.btnReporteCobranza.clicked.connect(self.generarReporteCobranza)
+
         botonesLayout2.addWidget(self.btnCreatePrestamo)
-        #botonesLayout2.addWidget(self.btnEditPrestamo)
         botonesLayout2.addWidget(self.btnAbonarPrestamo)
         botonesLayout2.addWidget(self.btnVerSolicitudes)
-        #botonesLayout2.addWidget(self.btnEliminarPrestamo)
+        botonesLayout2.addWidget(self.btnReporteCartera)
+        botonesLayout2.addWidget(self.btnReporteCobranza)
 
         prestamosLayout.addLayout(botonesLayout2)
 
@@ -530,10 +549,22 @@ class AdminWindow(QMainWindow):
 
     def cargarPrestamosCliente(self, cedula):
         self.tablaPrestamos.setRowCount(0)
-        prestamos = self.prestamos_por_cliente.setdefault(
-            cedula,
-            self.prestamosPredeterminados()
+        cliente = next(
+            (cliente for cliente in self.clientes if cliente["cedula"] == cedula),
+            None
         )
+        if cliente is None or cliente.get("id") is None:
+            return
+
+        try:
+            prestamos = listar_prestamos(int(cliente["id"]))
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al cargar prestamos",
+                f"No se pudieron cargar los prestamos: {error}"
+            )
+            return
 
         for prestamo in prestamos:
             fila = self.tablaPrestamos.rowCount()
@@ -544,7 +575,14 @@ class AdminWindow(QMainWindow):
                 self.tablaPrestamos.setItem(
                     fila,
                     columna,
-                    QTableWidgetItem(prestamo[clave])
+                    QTableWidgetItem(
+                        f"C$ {prestamo[clave]:,.2f}"
+                        if clave == "monto"
+                        else str(
+                            prestamo[clave] if clave != "plazo"
+                            else f"{prestamo[clave]} cuotas"
+                        )
+                    )
                 )
             self.agregarAccionesPrestamo(fila)
             self.tablaPrestamos.setRowHeight(fila, 42)
@@ -605,6 +643,33 @@ class AdminWindow(QMainWindow):
         )
 
         if respuesta != QMessageBox.Yes:
+            return
+
+        cliente_id = cliente.get("id")
+        if cliente_id is None:
+            QMessageBox.warning(
+                self,
+                "Cliente no valido",
+                "El cliente seleccionado no tiene un identificador de base de datos."
+            )
+            return
+
+        try:
+            eliminado = eliminar_cliente(int(cliente_id))
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al eliminar cliente",
+                f"No se pudo eliminar el cliente: {error}"
+            )
+            return
+
+        if not eliminado:
+            QMessageBox.warning(
+                self,
+                "Cliente no encontrado",
+                "El cliente no existe en la base de datos."
+            )
             return
 
         self.clientes.pop(indice_cliente)
@@ -721,16 +786,29 @@ class AdminWindow(QMainWindow):
             "direccion": self.infoDir.text()
         }
 
+        try:
+            cliente_id = crear_cliente(
+                self.newCl["nombre"],
+                self.newCl["cedula"],
+                self.newCl["correo"],
+                self.newCl["password"],
+                self.newCl["direccion"]
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al crear cliente",
+                f"No se pudo guardar el cliente: {error}"
+            )
+            return
+
+        self.newCl["id"] = cliente_id
         self.clientes.append(self.newCl)
         self.prestamos_por_cliente[self.newCl["cedula"]] = (
             self.prestamosPredeterminados()
         )
 
-        # Actualiza la lista visual inmediatamente y conserva los indices.
-        self.prestamos_por_cliente.pop(cliente["cedula"], None)
-        self.cliente_cedula = None
         self.buscarCliente()
-        self.tablaPrestamos.setRowCount(0)
 
         print(
             f"Lista de clientes actualizada: {self.clientes}"
@@ -1010,23 +1088,34 @@ class AdminWindow(QMainWindow):
             )
             return
 
-        ids = []
-        for fila in range(self.tablaPrestamos.rowCount()):
-            item = self.tablaPrestamos.item(fila, 0)
-            if item and item.text().isdigit():
-                ids.append(int(item.text()))
-        nuevo_id = f"{max(ids, default=0) + 1:03d}"
-
-        fila = self.tablaPrestamos.rowCount()
-        self.tablaPrestamos.insertRow(fila)
-        valores = [nuevo_id, monto, plazo, "Activo"]
-        for columna, valor in enumerate(valores):
-            self.tablaPrestamos.setItem(
-                fila, columna, QTableWidgetItem(valor)
+        try:
+            monto_numero = float(
+                monto.replace("C$", "").replace(",", "").strip()
             )
-        self.agregarAccionesPrestamo(fila)
-        self.tablaPrestamos.setRowHeight(fila, 42)
-        self.guardarPrestamosCliente()
+            plazo_numero = int(
+                plazo.casefold().replace("cuotas", "").strip()
+            )
+            nuevo_id = crear_prestamo(
+                int(cliente["id"]),
+                monto_numero,
+                plazo_numero
+            )
+        except (ValueError, TypeError) as error:
+            QMessageBox.warning(
+                self,
+                "Datos invalidos",
+                f"El monto y el plazo deben ser validos: {error}"
+            )
+            return
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al crear prestamo",
+                f"No se pudo guardar el prestamo: {error}"
+            )
+            return
+
+        self.cargarPrestamosCliente(cliente["cedula"])
 
         QMessageBox.information(
             self,
@@ -1069,6 +1158,48 @@ class AdminWindow(QMainWindow):
             self,
             "Solicitudes",
             "No hay solicitudes de prestamo pendientes."
+        )
+
+    def generarReporteCartera(self):
+        self.guardarPrestamosCliente()
+        try:
+            generar_estado_cartera(
+                self.clientes,
+                self.prestamos_por_cliente
+            )
+        except (OSError, ValueError, KeyError) as error:
+            QMessageBox.critical(
+                self,
+                "Error al generar reporte",
+                f"No se pudo generar el reporte de cartera: {error}"
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Reporte generado",
+            "El reporte de cartera se genero correctamente."
+        )
+
+    def generarReporteCobranza(self):
+        self.guardarPrestamosCliente()
+        try:
+            generar_reporte_cobranza(
+                self.clientes,
+                self.prestamos_por_cliente
+            )
+        except (OSError, ValueError, KeyError) as error:
+            QMessageBox.critical(
+                self,
+                "Error al generar reporte",
+                f"No se pudo generar el reporte de cobranza: {error}"
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Reporte generado",
+            "El reporte de cobranza se genero correctamente."
         )
 
     def buscarCliente(self):

@@ -41,7 +41,7 @@ def listar_clientes() -> list[dict[str, Any]]:
         cursor = conexion.cursor(dictionary=True)
         cursor.execute(
             """
-            SELECT id, nombre, cedula, correo, direccion, monto
+            SELECT id, nombre, cedula, correo, password, direccion, monto
             FROM clientes
             ORDER BY id
             """

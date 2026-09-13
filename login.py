@@ -5,6 +5,7 @@ from GUI_ADMIN import AdminWindow
 from GUI_REC import RecepWindow
 from GUI_CLIENTE import ClienteWindow
 from GUI_COB import CobWindow
+from clientes_crud import listar_clientes
 from pathlib import Path #
 import sys
 
@@ -28,6 +29,15 @@ class login(QMainWindow):
             {"id":"001","nombre": "Cliente 1", "cedula" : "2811234561000A", "correo": "ejemplo2@gmail.com", "password": "87654321", "direccion": "Iglesia San Isidro 1/2 cuadra bajo", "monto" : "1000"},
             {"id":"002","nombre": "Cliente 2", "cedula" : "2811234561007W", "correo": "ejemplo@gmail.com", "password": "12345678", "direccion": "Iglesia San Isidro 2 cuadra bajo", "monto": "20000"}
         ]
+
+        try:
+            self.clientes = listar_clientes()
+        except Exception as error:
+            QMessageBox.warning(
+                self,
+                "Base de datos no disponible",
+                f"No se pudieron cargar los clientes: {error}"
+            )
 
         self.intentosLogIn = 0
 
