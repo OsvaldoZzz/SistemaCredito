@@ -6,7 +6,7 @@ from GUI_REC import RecepWindow
 from GUI_CLIENTE import ClienteWindow
 from GUI_COB import CobWindow
 from clientes_crud import listar_clientes
-from pathlib import Path #
+from pathlib import Path 
 import sys
 
 
@@ -25,6 +25,7 @@ class login(QMainWindow):
             {"id":"1008","rol": "cobrador","usuario": "cobrador2", "password": "12345678"},
         ]
 
+        #Estos clientes ya no existen, los reales son los que estan en la bd
         self.clientes = [
             {"id":"001","nombre": "Cliente 1", "cedula" : "2811234561000A", "correo": "ejemplo2@gmail.com", "password": "87654321", "direccion": "Iglesia San Isidro 1/2 cuadra bajo", "monto" : "1000"},
             {"id":"002","nombre": "Cliente 2", "cedula" : "2811234561007W", "correo": "ejemplo@gmail.com", "password": "12345678", "direccion": "Iglesia San Isidro 2 cuadra bajo", "monto": "20000"}
@@ -169,13 +170,12 @@ class login(QMainWindow):
         usuario = self.input_user.text()
         password = self.input_password.text()
         correo = self.input_user.text()
-        print(f"Correo user ingresado: {correo}, Contraseña ingresada: {password}")
 
-        if len(password) != 8:
+        if not password:
             QMessageBox.warning(
                 self,
                 "Error",
-                "La contraseña debe tener 8 caracteres maximo."
+                "Ingresa tu contraseña."
             )
             return
         

@@ -1,5 +1,9 @@
 from PySide6.QtWidgets import *
+from PySide6.QtCore import QDate
 from PySide6.QtGui import QIcon
+from datetime import date
+from mysql.connector import Error as MySQLConnectorError
+from citas_crud import crear_cita
 
 
 class ClienteWindow(QMainWindow):
@@ -234,7 +238,7 @@ class ClienteWindow(QMainWindow):
         botonesLayout = QHBoxLayout()
 
         self.btnAgendar = QPushButton("Agendar cita")
-        #self.btnAgendar.clicked.connect(self.btnAgendar)
+        self.btnAgendar.clicked.connect(self.abrirDialogoAgendarCita)
         self.btnAgendar.setObjectName("agendar")
 
         self.btnCerrar = QPushButton("Cerrar Sesión")
@@ -248,8 +252,54 @@ class ClienteWindow(QMainWindow):
 
         layoutPrincipal.addWidget(frame)
 
-    def btnAgendar(self):
-        pass
+    def abrirDialogoAgendarCita(self):
+        dialogo = QDialog(self)
+        dialogo.setWindowTitle("Agendar cita")
+        dialogo.resize(360, 140)
+
+        formLayoutAC = QFormLayout(dialogo)
+        fecha_edit = QDateEdit()
+        fecha_edit.setCalendarPopup(True)
+        fecha_edit.setDate(QDate.currentDate())
+        fecha_edit.setDisplayFormat("dd/MM/yyyy")
+        formLayoutAC.addRow("Fecha:", fecha_edit)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        )
+        botones.accepted.connect(dialogo.accept)
+        botones.rejected.connect(dialogo.reject)
+        formLayoutAC.addRow(botones)
+
+        if dialogo.exec() == QDialog.Accepted:
+            cliente_id = self.cliente.get("id")
+            if cliente_id is None:
+                QMessageBox.critical(
+                    self,
+                    "Error al agendar cita",
+                    "No se pudo identificar al cliente."
+                )
+                return
+
+            fecha = date.fromisoformat(
+                fecha_edit.date().toString("yyyy-MM-dd")
+            )
+            try:
+                cita_id = crear_cita(int(cliente_id), fecha)
+            except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+                QMessageBox.critical(
+                    self,
+                    "Error al agendar cita",
+                    f"No se pudo guardar la cita: {error}"
+                )
+                return
+
+            QMessageBox.information(
+                self,
+                "Cita agendada",
+                f"La cita #{cita_id} quedo agendada para "
+                f"{fecha.strftime('%d/%m/%Y')}."
+            )
 
     def btnCerrSes(self):
 

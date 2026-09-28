@@ -344,6 +344,9 @@ class AdminWindow(QMainWindow):
 
         botonesLayout = QHBoxLayout()
 
+        #self.btnAcciones = QPushButton("Acciones")
+        
+
         self.btnCreate = QPushButton("Crear Cliente")
         self.btnCreate.setObjectName("crear_cliente")
 
@@ -930,7 +933,7 @@ class AdminWindow(QMainWindow):
             )
 
     def EyD(self):
-        botonAcc = self.sender()
+        botonAcc = self.sender() #sender es un metodo de QT, devuelve el objeto que emitio la senal que activo el metodo actual.
         fila = next(
             (
                 indice

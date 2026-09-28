@@ -2,8 +2,10 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
+from mysql.connector import Error as MySQLConnectorError
 from clientes_crud import crear_cliente
-from prestamos_crud import listar_prestamos
+from prestamos_crud import listar_prestamos, listar_todos_los_prestamos
+from reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 
 
 class RecepWindow(QMainWindow):
@@ -175,6 +177,14 @@ class RecepWindow(QMainWindow):
             }
 
             QPushButton:hover#abonar_prestamo {
+                background-color: gold;
+            }
+
+            QPushButton:hover#reportCart {
+                background-color: gold;
+            }
+
+            QPushButton:hover#reportCob {
                 background-color: gold;
             }
 
@@ -406,12 +416,28 @@ class RecepWindow(QMainWindow):
         )
         self.btnAbonarPrestamo.clicked.connect(self.abonarPrestamo)
 
+        self.btnReporteCartera = QPushButton("Reporte Cartera PDF")
+        self.btnReporteCartera.setObjectName("reportCart")
+        self.btnReporteCartera.clicked.connect(self.ReporteCartera)
+
+        self.btnReporteCobranza = QPushButton("Reporte Cobranza PDF")
+        self.btnReporteCobranza.setObjectName("reporteCob")
+        self.btnReporteCobranza.clicked.connect(self.ReporteCobranza)
+
         botonesLayout2.addWidget(
             self.btnSoliPrestamo
         )
 
         botonesLayout2.addWidget(
             self.btnAbonarPrestamo
+        )
+
+        botonesLayout2.addWidget(
+            self.btnReporteCartera
+        )
+
+        botonesLayout2.addWidget(
+            self.btnReporteCobranza
         )
 
         botonesLayout2.addWidget(self.btnVerCitas)
@@ -496,7 +522,13 @@ class RecepWindow(QMainWindow):
 
         try:
             prestamos = listar_prestamos(int(cliente["id"]))
-        except Exception as error:
+        except (
+            MySQLConnectorError,
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+        ) as error:
             QMessageBox.critical(
                 self,
                 "Error al cargar prestamos",
@@ -636,7 +668,13 @@ class RecepWindow(QMainWindow):
                 self.newCl["password"],
                 self.newCl["direccion"]
             )
-        except Exception as error:
+        except (
+            MySQLConnectorError,
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+        ) as error:
             QMessageBox.critical(
                 self,
                 "Error al crear cliente",
@@ -770,6 +808,76 @@ class RecepWindow(QMainWindow):
             "Citas",
             f"No hay citas registradas para {cliente['nombre']}."
         )
+
+    def ReporteCartera(self):
+        try:
+            prestamos_por_cliente = self.obtenerPrestamosGlobales()
+            generar_estado_cartera(
+                self.clientes,
+                prestamos_por_cliente
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al generar reporte",
+                f"No se pudo generar el reporte de cartera: {error}"
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Reporte generado",
+            "El reporte global de cartera se genero correctamente."
+        )
+
+    def ReporteCobranza(self):
+        try:
+            prestamos_por_cliente = self.obtenerPrestamosGlobales()
+            generar_reporte_cobranza(
+                self.clientes,
+                prestamos_por_cliente
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al generar reporte",
+                f"No se pudo generar el reporte de cobranza: {error}"
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Reporte generado",
+            "El reporte global de cobranza se genero correctamente."
+        )
+
+    def obtenerPrestamosGlobales(self):
+        prestamos_por_cliente = {
+            cliente["cedula"]: []
+            for cliente in self.clientes
+        }
+        clientes_por_id = {
+            int(cliente["id"]): cliente
+            for cliente in self.clientes
+            if cliente.get("id") is not None
+        }
+
+        for prestamo in listar_todos_los_prestamos():
+            cliente = clientes_por_id.get(int(prestamo["cliente_id"]))
+            if cliente is None:
+                raise ValueError(
+                    "Se encontro un prestamo asociado a un cliente "
+                    "que no esta cargado."
+                )
+
+            prestamos_por_cliente[cliente["cedula"]].append({
+                "id": prestamo["id"],
+                "monto": f"C$ {float(prestamo['monto']):,.2f}",
+                "plazo": f"{prestamo['plazo']} cuotas",
+                "estado": prestamo["estado"],
+            })
+
+        return prestamos_por_cliente
 
     def btnCerrSes(self):
 

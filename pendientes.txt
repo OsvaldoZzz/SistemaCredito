@@ -4,3 +4,13 @@ Pendientes: 07-09-26
 -> borrar la opcion de escribir sobre la tabla.
 -> agregar interes.
 -> agregar panelcito de buscar cliente.
+
+Pendiente: 28/09/26
+-> conectar boton de solicitar prestamo a panel de admin y cambiarle el diseño, ademas de agregar el formulario a llenar.
+-> conectar boton de agendar citas (panel cliente) al de recepcionista 
+-> cambiar diseño de los botones de la tabla (panel administrador (editar, eliminar))
+-> validaciones
+-> crear botones que contengan otras funciones (todos los paneles, menos el de cliente)
+===========================
+    -> REVISAR DISEÑOS.
+===========================

@@ -24,6 +24,25 @@ def listar_prestamos(cliente_id: int) -> list[dict[str, Any]]:
         conexion.close()
 
 
+def listar_todos_los_prestamos() -> list[dict[str, Any]]:
+    conexion = obtener_conexion()
+    cursor = None
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT id, cliente_id, monto, plazo, estado
+            FROM prestamo
+            ORDER BY cliente_id, id
+            """
+        )
+        return cursor.fetchall()
+    finally:
+        if cursor is not None:
+            cursor.close()
+        conexion.close()
+
+
 def crear_prestamo(
     cliente_id: int,
     monto: float,

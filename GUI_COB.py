@@ -3,7 +3,8 @@ from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
 from clientes_crud import crear_cliente
-from prestamos_crud import listar_prestamos
+from prestamos_crud import listar_prestamos, listar_todos_los_prestamos
+from reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 
 
 class CobWindow(QMainWindow):
@@ -166,6 +167,14 @@ class CobWindow(QMainWindow):
                 background-color: green;
             }
 
+            QPushButton:hover#reportCart {
+                background-color: gold;
+            }
+
+            QPushButton:hover#reportCob {
+                background-color: gold;
+            }
+
             QPushButton:hover#cerrarSesion {
                 background-color: red;
             }
@@ -175,7 +184,7 @@ class CobWindow(QMainWindow):
             }
 
             QPushButton:hover#abonar_prestamo {
-                background-color: gold;
+                background-color: green;
             }
 
             QMessageBox {
@@ -272,21 +281,43 @@ class CobWindow(QMainWindow):
 
         clientesLayout.addWidget(self.listaClientes)
 
-        botonesLayout = QHBoxLayout()
+        botonesLayout = QGridLayout()
+        botonesLayout.setSpacing(8)
 
         self.btnAbonarPrestamo = QPushButton("Abonar Prestamo")
         self.btnAbonarPrestamo.setObjectName(
             "abonar_prestamo"
         )
 
+        self.btnReporteCartera = QPushButton("Reporte Cartera PDF")
+        self.btnReporteCartera.setObjectName("reportCart")
+
+        self.btnReporteCobrador = QPushButton("Reporte Cobranza PDF")
+        self.btnReporteCobrador.setObjectName("reportCob")
+
         self.btnCerrar = QPushButton("Cerrar Sesion")
         self.btnCerrar.setObjectName("cerrarSesion")
 
+
+
         self.btnAbonarPrestamo.clicked.connect(self.abonarPrestamo)
+        self.btnReporteCartera.clicked.connect(self.generarReporteCartera)
+        self.btnReporteCobrador.clicked.connect(self.generarReporteCobranza)
         self.btnCerrar.clicked.connect(self.btnCerrSes)
 
-        botonesLayout.addWidget(self.btnAbonarPrestamo)
-        botonesLayout.addWidget(self.btnCerrar)
+        botones = (
+            self.btnAbonarPrestamo,
+            self.btnReporteCartera,
+            self.btnReporteCobrador,
+            self.btnCerrar,
+        )
+        for boton in botones:
+            boton.setMinimumHeight(42)
+
+        botonesLayout.addWidget(self.btnAbonarPrestamo, 0, 0)
+        botonesLayout.addWidget(self.btnReporteCartera, 0, 1)
+        botonesLayout.addWidget(self.btnReporteCobrador, 1, 0)
+        botonesLayout.addWidget(self.btnCerrar, 1, 1)
 
         clientesLayout.addLayout(botonesLayout)
 
@@ -388,6 +419,9 @@ class CobWindow(QMainWindow):
             1,
             1
         )
+
+        botonesLayout = QHBoxLayout()
+
 
         # =====================================================
         # PROPORCIONES
@@ -539,6 +573,77 @@ class CobWindow(QMainWindow):
             "Abono registrado",
             f"Se registro un abono de C$ {monto:,.2f} "
             f"para el prestamo {id_item.text()} de {cliente['nombre']}."
+        )
+
+    def generarReportesGlobales(self):
+        prestamos_por_cliente = {
+            cliente["cedula"]: []
+            for cliente in self.clientes
+        }
+        clientes_por_id = {
+            int(cliente["id"]): cliente
+            for cliente in self.clientes
+            if cliente.get("id") is not None
+        }
+
+        prestamos = listar_todos_los_prestamos()
+        for prestamo in prestamos:
+            cliente = clientes_por_id.get(int(prestamo["cliente_id"]))
+            if cliente is None:
+                raise ValueError(
+                    "Se encontro un prestamo asociado a un cliente "
+                    "que no esta cargado."
+                )
+
+            prestamos_por_cliente[cliente["cedula"]].append({
+                "id": prestamo["id"],
+                "monto": f"C$ {float(prestamo['monto']):,.2f}",
+                "plazo": f"{prestamo['plazo']} cuotas",
+                "estado": prestamo["estado"],
+            })
+
+        return prestamos_por_cliente
+
+    def generarReporteCartera(self):
+        try:
+            prestamos_por_cliente = self.generarReportesGlobales()
+            generar_estado_cartera(
+                self.clientes,
+                prestamos_por_cliente
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al generar reporte",
+                f"No se pudo generar el reporte de cartera: {error}"
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Reporte generado",
+            "El reporte global de cartera se genero correctamente."
+        )
+
+    def generarReporteCobranza(self):
+        try:
+            prestamos_por_cliente = self.generarReportesGlobales()
+            generar_reporte_cobranza(
+                self.clientes,
+                prestamos_por_cliente
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al generar reporte",
+                f"No se pudo generar el reporte de cobranza: {error}"
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Reporte generado",
+            "El reporte global de cobranza se genero correctamente."
         )
 
     # ==========================================================
