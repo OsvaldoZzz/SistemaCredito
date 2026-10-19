@@ -147,3 +147,9 @@ Color celestito: #3B82F6
 def buscarCliente(self):
     for clientesBuscar == clientes[cedula]:
     
+En el panel de cobrador o recepcionista, el flujo es:
+
+La aplicación consulta todos los préstamos con listar_todos_los_prestamos.
+Agrupa los préstamos por cliente.
+Envía los datos a las funciones de reportes_pdf.py, que crean el PDF con ReportLab.
+El PDF se abre automáticamente al terminar.

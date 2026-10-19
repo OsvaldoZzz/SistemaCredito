@@ -1,16 +1,18 @@
 Pendientes: 07-09-26
--> en la parte de acciones cambiar el ojito por un lapiz y una basurita (Crear un boton extra)
--> el qss para la parte de editar Prestamo.
--> borrar la opcion de escribir sobre la tabla.
--> agregar interes.
--> agregar panelcito de buscar cliente.
+[COMPLETADO] botones de edición/eliminación de préstamos con iconos de lápiz y papelera.
+[COMPLETADO] estilo y controles para editar préstamos.
+[COMPLETADO] bloquear edición directa de las tablas.
+[COMPLETADO] aplicar 2% de interés único sobre el monto inicial, redondeado a centavos; mostrar interés y total a pagar en préstamos, solicitudes y reportes.
+[COMPLETADO] paneles de búsqueda de clientes.
 
 Pendiente: 28/09/26
--> conectar boton de solicitar prestamo a panel de admin y cambiarle el diseño, ademas de agregar el formulario a llenar.
--> conectar boton de agendar citas (panel cliente) al de recepcionista 
--> cambiar diseño de los botones de la tabla (panel administrador (editar, eliminar))
--> validaciones
--> crear botones que contengan otras funciones (todos los paneles, menos el de cliente)
+[COMPLETADO] conectar solicitud de préstamo con administración, con formulario y flujo de aprobación/rechazo.
+[COMPLETADO] conectar las citas del cliente con el panel de recepcionista.
+[COMPLETADO] acciones de editar/eliminar en la tabla de préstamos y persistencia en MySQL.
+[COMPLETADO] agregar validaciones en formularios de cliente, préstamo y citas.
+[COMPLETADO] agregar actualización de datos en paneles de administración, recepción y cobranza.
+[COMPLETADO] permitir iniciar sesión con Enter desde el campo de contraseña.
+[PENDIENTE MANUAL] definir calendario de vencimientos y regla de mora; el usuario agregará ese campo/regla manualmente.
 ===========================
     -> REVISAR DISEÑOS.
 ===========================

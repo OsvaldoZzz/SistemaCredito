@@ -1,12 +1,21 @@
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import landscape, letter
 from reportlab.pdfgen import canvas
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 import os
+from decimal import Decimal
+from calculos_prestamo import calcular_interes, calcular_total_prestamo
+
+
+def _monto_decimal(valor):
+    if isinstance(valor, str):
+        valor = valor.replace("C$", "").replace(",", "").strip()
+    return Decimal(str(valor))
+
 
 def generar_estado_cartera(clientes, prestamos_por_cliente, filename="estado_cartera.pdf"):
-    doc = SimpleDocTemplate(filename, pagesize=letter)
+    doc = SimpleDocTemplate(filename, pagesize=landscape(letter))
     elements = []
     styles = getSampleStyleSheet()
 
@@ -15,12 +24,23 @@ def generar_estado_cartera(clientes, prestamos_por_cliente, filename="estado_car
     elements.append(Spacer(1, 12))
 
     # Datos de la tabla
-    data = [["Cliente", "Cédula", "Monto Total Préstamos", "Estado"]]
+    data = [[
+        "Cliente", "Cédula", "Capital", "Interés (2%)", "Total a pagar", "Estado"
+    ]]
 
     for cliente in clientes:
         cedula = cliente["cedula"]
         prestamos = prestamos_por_cliente.get(cedula, [])
-        total = sum([float(p["monto"].replace("C$", "").replace(",", "").strip()) for p in prestamos if "monto" in p])
+        capital = sum(
+            (_monto_decimal(p["monto"]) for p in prestamos if "monto" in p),
+            Decimal("0.00"),
+        )
+        interes = sum(
+            (calcular_interes(_monto_decimal(p["monto"])) for p in prestamos
+             if "monto" in p),
+            Decimal("0.00"),
+        )
+        total = capital + interes
 
         # Simplificación del estado: si hay préstamos, está "Activo"
         estado = "Activo" if prestamos else "Sin Préstamos"
@@ -28,7 +48,9 @@ def generar_estado_cartera(clientes, prestamos_por_cliente, filename="estado_car
         data.append([
             cliente["nombre"],
             cedula,
-            f"C$ {total:,.2f}",
+            f"C$ {float(capital):,.2f}",
+            f"C$ {float(interes):,.2f}",
+            f"C$ {float(total):,.2f}",
             estado
         ])
 
@@ -50,14 +72,17 @@ def generar_estado_cartera(clientes, prestamos_por_cliente, filename="estado_car
     os.startfile(filename)
 
 def generar_reporte_cobranza(clientes, prestamos_por_cliente, filename="reporte_cobranza.pdf"):
-    doc = SimpleDocTemplate(filename, pagesize=letter)
+    doc = SimpleDocTemplate(filename, pagesize=landscape(letter))
     elements = []
     styles = getSampleStyleSheet()
 
     elements.append(Paragraph("REPORTE FINANCIERO DE COBRANZA", styles['Title']))
     elements.append(Spacer(1, 12))
 
-    data = [["ID Préstamo", "Cliente", "Monto", "Plazo", "Estado"]]
+    data = [[
+        "ID Préstamo", "Cliente", "Capital", "Interés (2%)",
+        "Total", "Plazo", "Estado"
+    ]]
 
     for cliente in clientes:
         cedula = cliente["cedula"]
@@ -67,6 +92,8 @@ def generar_reporte_cobranza(clientes, prestamos_por_cliente, filename="reporte_
                 p["id"],
                 cliente["nombre"],
                 p["monto"],
+                f"C$ {calcular_interes(_monto_decimal(p['monto'])):,.2f}",
+                f"C$ {calcular_total_prestamo(_monto_decimal(p['monto'])):,.2f}",
                 p["plazo"],
                 p["estado"]
             ])

@@ -4,6 +4,12 @@ from PySide6.QtGui import QIcon
 from datetime import date
 from mysql.connector import Error as MySQLConnectorError
 from citas_crud import crear_cita
+from prestamos_crud import listar_prestamos
+from calculos_prestamo import (
+    PORCENTAJE_INTERES,
+    calcular_interes,
+    calcular_total_prestamo,
+)
 
 
 class ClienteWindow(QMainWindow):
@@ -192,34 +198,22 @@ class ClienteWindow(QMainWindow):
 
         self.tablaPrestamos = QTableWidget()
 
-        self.tablaPrestamos.setColumnCount(4)
+        self.tablaPrestamos.setColumnCount(6)
+        self.tablaPrestamos.setEditTriggers(
+            QAbstractItemView.NoEditTriggers
+        )
+        self.tablaPrestamos.setSelectionBehavior(
+            QAbstractItemView.SelectRows
+        )
 
         self.tablaPrestamos.setHorizontalHeaderLabels([
             "ID",
-            "Monto",
+            "Monto inicial",
+            f"Interés ({PORCENTAJE_INTERES:.0f}%)",
+            "Total a pagar",
             "Plazo",
             "Estado"
         ])
-
-        # Ejemplo temporal
-
-        self.tablaPrestamos.setRowCount(1)
-
-        self.tablaPrestamos.setItem(
-            0, 0, QTableWidgetItem("001")
-        )
-
-        self.tablaPrestamos.setItem(
-            0, 1, QTableWidgetItem("C$20,000")
-        )
-
-        self.tablaPrestamos.setItem(
-            0, 2, QTableWidgetItem("10 cuotas")
-        )
-
-        self.tablaPrestamos.setItem(
-            0, 3, QTableWidgetItem("Activo")
-        )
 
         self.tablaPrestamos.horizontalHeader().setStretchLastSection(True)
 
@@ -228,6 +222,7 @@ class ClienteWindow(QMainWindow):
         )
 
         layoutFrame.addWidget(self.tablaPrestamos)
+        self.cargarPrestamos()
 
         layoutFrame.addStretch()
 
@@ -261,6 +256,7 @@ class ClienteWindow(QMainWindow):
         fecha_edit = QDateEdit()
         fecha_edit.setCalendarPopup(True)
         fecha_edit.setDate(QDate.currentDate())
+        fecha_edit.setMinimumDate(QDate.currentDate())
         fecha_edit.setDisplayFormat("dd/MM/yyyy")
         formLayoutAC.addRow("Fecha:", fecha_edit)
 
@@ -300,6 +296,43 @@ class ClienteWindow(QMainWindow):
                 f"La cita #{cita_id} quedo agendada para "
                 f"{fecha.strftime('%d/%m/%Y')}."
             )
+
+    def cargarPrestamos(self):
+        self.tablaPrestamos.setRowCount(0)
+        cliente_id = self.cliente.get("id")
+        if cliente_id is None:
+            QMessageBox.critical(
+                self,
+                "Error al cargar préstamos",
+                "No se pudo identificar al cliente."
+            )
+            return
+
+        try:
+            prestamos = listar_prestamos(int(cliente_id))
+        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            QMessageBox.critical(
+                self,
+                "Error al cargar préstamos",
+                f"No se pudieron cargar los préstamos: {error}"
+            )
+            return
+
+        for prestamo in prestamos:
+            fila = self.tablaPrestamos.rowCount()
+            self.tablaPrestamos.insertRow(fila)
+            valores = (
+                str(prestamo["id"]),
+                f"C$ {float(prestamo['monto']):,.2f}",
+                f"C$ {calcular_interes(prestamo['monto']):,.2f}",
+                f"C$ {calcular_total_prestamo(prestamo['monto']):,.2f}",
+                f"{prestamo['plazo']} cuotas",
+                prestamo["estado"],
+            )
+            for columna, valor in enumerate(valores):
+                self.tablaPrestamos.setItem(
+                    fila, columna, QTableWidgetItem(valor)
+                )
 
     def btnCerrSes(self):
 

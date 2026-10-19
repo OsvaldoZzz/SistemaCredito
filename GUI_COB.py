@@ -2,9 +2,16 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
-from clientes_crud import crear_cliente
+from mysql.connector import Error as MySQLConnectorError
+from clientes_crud import crear_cliente, listar_clientes
 from prestamos_crud import listar_prestamos, listar_todos_los_prestamos
 from reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
+from validaciones import validar_cliente_unico, validar_datos_cliente
+from calculos_prestamo import (
+    PORCENTAJE_INTERES,
+    calcular_interes,
+    calcular_total_prestamo,
+)
 
 
 class CobWindow(QMainWindow):
@@ -295,6 +302,9 @@ class CobWindow(QMainWindow):
         self.btnReporteCobrador = QPushButton("Reporte Cobranza PDF")
         self.btnReporteCobrador.setObjectName("reportCob")
 
+        self.btnActualizar = QPushButton("Actualizar datos")
+        self.btnActualizar.clicked.connect(self.actualizarDatos)
+
         self.btnCerrar = QPushButton("Cerrar Sesion")
         self.btnCerrar.setObjectName("cerrarSesion")
 
@@ -309,6 +319,7 @@ class CobWindow(QMainWindow):
             self.btnAbonarPrestamo,
             self.btnReporteCartera,
             self.btnReporteCobrador,
+            self.btnActualizar,
             self.btnCerrar,
         )
         for boton in botones:
@@ -317,7 +328,8 @@ class CobWindow(QMainWindow):
         botonesLayout.addWidget(self.btnAbonarPrestamo, 0, 0)
         botonesLayout.addWidget(self.btnReporteCartera, 0, 1)
         botonesLayout.addWidget(self.btnReporteCobrador, 1, 0)
-        botonesLayout.addWidget(self.btnCerrar, 1, 1)
+        botonesLayout.addWidget(self.btnActualizar, 1, 1)
+        botonesLayout.addWidget(self.btnCerrar, 2, 0, 1, 2)
 
         clientesLayout.addLayout(botonesLayout)
 
@@ -360,7 +372,7 @@ class CobWindow(QMainWindow):
 
         self.tablaPrestamos = QTableWidget()
 
-        self.tablaPrestamos.setColumnCount(4)
+        self.tablaPrestamos.setColumnCount(6)
         self.tablaPrestamos.setEditTriggers(
             QAbstractItemView.NoEditTriggers
         )
@@ -370,32 +382,16 @@ class CobWindow(QMainWindow):
 
         self.tablaPrestamos.setHorizontalHeaderLabels([
             "ID",
-            "Monto",
+            "Monto inicial",
+            f"Interés ({PORCENTAJE_INTERES:.0f}%)",
+            "Total a pagar",
             "Plazo",
             "Estado"
         ])
 
         self.tablaPrestamos.setObjectName("tablaPrestamos")
 
-        # Ejemplo temporal
-
-        self.tablaPrestamos.setRowCount(1)
-
-        self.tablaPrestamos.setItem(
-            0, 0, QTableWidgetItem("001")
-        )
-
-        self.tablaPrestamos.setItem(
-            0, 1, QTableWidgetItem("C$20,000")
-        )
-
-        self.tablaPrestamos.setItem(
-            0, 2, QTableWidgetItem("10 cuotas")
-        )
-
-        self.tablaPrestamos.setItem(
-            0, 3, QTableWidgetItem("Activo")
-        )
+        self.tablaPrestamos.setRowCount(0)
 
         self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch
@@ -446,6 +442,39 @@ class CobWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, indice)
             self.listaClientes.addItem(item)
 
+    def actualizarDatos(self):
+        cliente_actual = self.clienteSeleccionado()
+        cliente_id = cliente_actual.get("id") if cliente_actual else None
+        try:
+            clientes = listar_clientes()
+        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            QMessageBox.critical(
+                self,
+                "Error al actualizar",
+                f"No se pudieron cargar los datos actualizados: {error}"
+            )
+            return
+
+        self.clientes = clientes
+        self.clientesBuscar.clear()
+        self.cargarListaClientes()
+        if not self.clientes:
+            self.tablaPrestamos.setRowCount(0)
+            self.lblCliente.setText("Seleccione un cliente")
+            self.lblCorreo.setText("Correo: -")
+            self.lblDir.setText("Direccion: -")
+            return
+
+        fila = next(
+            (
+                indice for indice, cliente in enumerate(self.clientes)
+                if cliente.get("id") == cliente_id
+            ),
+            0,
+        )
+        self.listaClientes.setCurrentRow(fila)
+        self.mostrarCliente(self.listaClientes.currentItem())
+
     def mostrarCliente(self, item):
         indice_cliente = item.data(Qt.ItemDataRole.UserRole)
         if indice_cliente is None:
@@ -492,6 +521,8 @@ class CobWindow(QMainWindow):
             valores = (
                 str(prestamo["id"]),
                 f"C$ {float(prestamo['monto']):,.2f}",
+                f"C$ {calcular_interes(prestamo['monto']):,.2f}",
+                f"C$ {calcular_total_prestamo(prestamo['monto']):,.2f}",
                 f"{prestamo['plazo']} cuotas",
                 prestamo["estado"],
             )
@@ -598,6 +629,8 @@ class CobWindow(QMainWindow):
             prestamos_por_cliente[cliente["cedula"]].append({
                 "id": prestamo["id"],
                 "monto": f"C$ {float(prestamo['monto']):,.2f}",
+                "interes": f"C$ {calcular_interes(prestamo['monto']):,.2f}",
+                "total": f"C$ {calcular_total_prestamo(prestamo['monto']):,.2f}",
                 "plazo": f"{prestamo['plazo']} cuotas",
                 "estado": prestamo["estado"],
             })
@@ -690,7 +723,7 @@ class CobWindow(QMainWindow):
         self.infoName.setPlaceholderText(
             "Ingresa tu nombre..."
         )
-        self.infoName.setMaxLength(10)
+        self.infoName.setMaxLength(80)
 
         self.infoEmail = QLineEdit("")
         self.infoEmail.setPlaceholderText(
@@ -701,13 +734,14 @@ class CobWindow(QMainWindow):
         self.infoCedula.setPlaceholderText(
             "Ingresa tu cedula"
         )
-        self.infoCedula.setMaxLength(16)
+        self.infoCedula.setMaxLength(20)
 
         self.infoPassword = QLineEdit("")
         self.infoPassword.setPlaceholderText(
             "Ingresa tu contraseña..."
         )
-        self.infoPassword.setMaxLength(8)
+        self.infoPassword.setEchoMode(QLineEdit.Password)
+        self.infoPassword.setMaxLength(128)
 
         self.infoDir = QLineEdit("")
         self.infoDir.setPlaceholderText(
@@ -746,6 +780,25 @@ class CobWindow(QMainWindow):
                 "Campos Vacios",
                 "Debes llenar todos los campos."
             )
+            return
+
+        error_validacion = validar_datos_cliente(
+            self.infoName.text(),
+            self.infoCedula.text(),
+            self.infoEmail.text(),
+            self.infoPassword.text(),
+            self.infoDir.text(),
+        )
+        if error_validacion:
+            QMessageBox.warning(self, "Datos inválidos", error_validacion)
+            return
+        error_duplicado = validar_cliente_unico(
+            self.clientes,
+            self.infoCedula.text(),
+            self.infoEmail.text(),
+        )
+        if error_duplicado:
+            QMessageBox.warning(self, "Cliente duplicado", error_duplicado)
             return
 
         self.newCl = {

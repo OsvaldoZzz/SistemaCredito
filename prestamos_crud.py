@@ -1,6 +1,62 @@
+import math
 from typing import Any
 
 from conexion import obtener_conexion
+
+
+def actualizar_prestamo(
+    prestamo_id: int,
+    monto: float,
+    plazo: int,
+    estado: str,
+) -> bool:
+    if not math.isfinite(monto) or monto <= 0 or plazo <= 0:
+        raise ValueError("El monto y el plazo deben ser mayores que cero.")
+    if estado not in {"Activo", "Pagado", "Vencido"}:
+        raise ValueError("El estado del préstamo no es válido.")
+
+    conexion = obtener_conexion()
+    cursor = None
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("SELECT id FROM prestamo WHERE id = %s", (prestamo_id,))
+        if cursor.fetchone() is None:
+            conexion.rollback()
+            return False
+        cursor.execute(
+            """
+            UPDATE prestamo
+            SET monto = %s, plazo = %s, estado = %s
+            WHERE id = %s
+            """,
+            (monto, plazo, estado, prestamo_id),
+        )
+        conexion.commit()
+        return True
+    except Exception:
+        conexion.rollback()
+        raise
+    finally:
+        if cursor is not None:
+            cursor.close()
+        conexion.close()
+
+
+def eliminar_prestamo(prestamo_id: int) -> bool:
+    conexion = obtener_conexion()
+    cursor = None
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("DELETE FROM prestamo WHERE id = %s", (prestamo_id,))
+        conexion.commit()
+        return cursor.rowcount > 0
+    except Exception:
+        conexion.rollback()
+        raise
+    finally:
+        if cursor is not None:
+            cursor.close()
+        conexion.close()
 
 
 def listar_prestamos(cliente_id: int) -> list[dict[str, Any]]:
@@ -49,6 +105,11 @@ def crear_prestamo(
     plazo: int,
     estado: str = "Activo",
 ) -> int:
+    if not math.isfinite(monto) or monto <= 0 or plazo <= 0:
+        raise ValueError("El monto y el plazo deben ser mayores que cero.")
+    if estado not in {"Activo", "Pagado", "Vencido"}:
+        raise ValueError("El estado del préstamo no es válido.")
+
     conexion = obtener_conexion()
     cursor = None
     try:

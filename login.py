@@ -6,6 +6,7 @@ from GUI_REC import RecepWindow
 from GUI_CLIENTE import ClienteWindow
 from GUI_COB import CobWindow
 from clientes_crud import listar_clientes
+from validaciones import validar_campos_login
 from pathlib import Path 
 import sys
 
@@ -145,11 +146,13 @@ class login(QMainWindow):
 
         self.input_user = QLineEdit()
         self.input_user.setPlaceholderText("Ingresar usuario o correo")
+        self.input_user.returnPressed.connect(self.iniciarSesion)
 
         self.input_password = QLineEdit()
         self.input_password.setPlaceholderText("Ingresar contraseña")
         self.input_password.setEchoMode(QLineEdit.Password)
         self.input_password.setMaxLength(8)
+        self.input_password.returnPressed.connect(self.iniciarSesion)
 
         botones_layout = QHBoxLayout() #Para poner los botones lado a lado.
 
@@ -167,20 +170,23 @@ class login(QMainWindow):
         layout.addLayout(botones_layout)
 
     def iniciarSesion(self):
-        usuario = self.input_user.text()
+        usuario = self.input_user.text().strip()
         password = self.input_password.text()
-        correo = self.input_user.text()
 
-        if not password:
+        error_validacion = validar_campos_login(usuario, password)
+        if error_validacion:
             QMessageBox.warning(
                 self,
-                "Error",
-                "Ingresa tu contraseña."
+                "Datos incompletos",
+                error_validacion
             )
             return
         
         for rol in self.usuarios:
-            if rol["usuario"] == usuario and rol["password"] == password:
+            if (
+                rol["usuario"].strip().casefold() == usuario.casefold()
+                and rol["password"] == password
+            ):
                 QMessageBox.information(
                     self,
                     "Inicio de Sesion",
@@ -206,7 +212,11 @@ class login(QMainWindow):
                 return
 
         for cliente in self.clientes:
-            if cliente["correo"] == correo and cliente["password"] == password:
+            if (
+                cliente.get("correo", "").strip().casefold()
+                == usuario.casefold()
+                and cliente.get("password") == password
+            ):
                 QMessageBox.information(
                     self,
                     "Inicio de Sesion",

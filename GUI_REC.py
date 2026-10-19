@@ -3,9 +3,19 @@ from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
 from mysql.connector import Error as MySQLConnectorError
-from clientes_crud import crear_cliente
+from clientes_crud import crear_cliente, listar_clientes
+from citas_crud import (
+    listar_todas_las_citas,
+)
 from prestamos_crud import listar_prestamos, listar_todos_los_prestamos
 from reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
+from solicitudes_crud import crear_solicitud_prestamo
+from validaciones import validar_cliente_unico, validar_datos_cliente
+from calculos_prestamo import (
+    PORCENTAJE_INTERES,
+    calcular_interes,
+    calcular_total_prestamo,
+)
 
 
 class RecepWindow(QMainWindow):
@@ -298,6 +308,9 @@ class RecepWindow(QMainWindow):
         self.btnCreate = QPushButton("Crear Cliente")
         self.btnCreate.setObjectName("crear_cliente")
 
+        self.btnActualizar = QPushButton("Actualizar datos")
+        self.btnActualizar.clicked.connect(self.actualizarDatos)
+
         self.btnCerrar = QPushButton("Cerrar Sesion")
         self.btnCerrar.setObjectName("cerrarSesion")
 
@@ -305,6 +318,7 @@ class RecepWindow(QMainWindow):
         self.btnCerrar.clicked.connect(self.btnCerrSes)
 
         botonesLayout.addWidget(self.btnCreate)
+        botonesLayout.addWidget(self.btnActualizar)
         botonesLayout.addWidget(self.btnCerrar)
 
         clientesLayout.addLayout(botonesLayout)
@@ -346,7 +360,7 @@ class RecepWindow(QMainWindow):
 
         self.tablaPrestamos = QTableWidget()
 
-        self.tablaPrestamos.setColumnCount(4)
+        self.tablaPrestamos.setColumnCount(6)
         self.tablaPrestamos.setEditTriggers(
             QAbstractItemView.NoEditTriggers
         )
@@ -356,32 +370,16 @@ class RecepWindow(QMainWindow):
 
         self.tablaPrestamos.setHorizontalHeaderLabels([
             "ID",
-            "Monto",
+            "Monto inicial",
+            f"Interés ({PORCENTAJE_INTERES:.0f}%)",
+            "Total a pagar",
             "Plazo",
             "Estado"
         ])
 
         self.tablaPrestamos.setObjectName("tablaPrestamos")
 
-        # Ejemplo temporal
-
-        self.tablaPrestamos.setRowCount(1)
-
-        self.tablaPrestamos.setItem(
-            0, 0, QTableWidgetItem("001")
-        )
-
-        self.tablaPrestamos.setItem(
-            0, 1, QTableWidgetItem("C$20,000")
-        )
-
-        self.tablaPrestamos.setItem(
-            0, 2, QTableWidgetItem("10 cuotas")
-        )
-
-        self.tablaPrestamos.setItem(
-            0, 3, QTableWidgetItem("Activo")
-        )
+        self.tablaPrestamos.setRowCount(0)
 
         self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch
@@ -475,22 +473,38 @@ class RecepWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, indice)
             self.listaClientes.addItem(item)
 
-    @staticmethod
-    def prestamosPredeterminados():
-        return [
-            {
-                "id": "001",
-                "monto": "C$20,000",
-                "plazo": "10 cuotas",
-                "estado": "Activo",
-            },
-            {
-                "id": "002",
-                "monto": "C$10,000",
-                "plazo": "5 cuotas",
-                "estado": "Activo",
-            },
-        ]
+    def actualizarDatos(self):
+        cliente_actual = self.clienteSeleccionado()
+        cliente_id = cliente_actual.get("id") if cliente_actual else None
+        try:
+            clientes = listar_clientes()
+        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            QMessageBox.critical(
+                self,
+                "Error al actualizar",
+                f"No se pudieron cargar los datos actualizados: {error}"
+            )
+            return
+
+        self.clientes = clientes
+        self.clientesBuscar.clear()
+        self.cargarListaClientes()
+        if not self.clientes:
+            self.tablaPrestamos.setRowCount(0)
+            self.lblCliente.setText("Seleccione un cliente")
+            self.lblCorreo.setText("Correo: -")
+            self.lblDir.setText("Direccion: -")
+            return
+
+        fila = next(
+            (
+                indice for indice, cliente in enumerate(self.clientes)
+                if cliente.get("id") == cliente_id
+            ),
+            0,
+        )
+        self.listaClientes.setCurrentRow(fila)
+        self.mostrarCliente(self.listaClientes.currentItem())
 
     def mostrarCliente(self, item):
         indice_cliente = item.data(Qt.ItemDataRole.UserRole)
@@ -542,6 +556,8 @@ class RecepWindow(QMainWindow):
             valores = (
                 str(prestamo["id"]),
                 f"C$ {float(prestamo['monto']):,.2f}",
+                f"C$ {calcular_interes(prestamo['monto']):,.2f}",
+                f"C$ {calcular_total_prestamo(prestamo['monto']):,.2f}",
                 f"{prestamo['plazo']} cuotas",
                 prestamo["estado"],
             )
@@ -594,7 +610,7 @@ class RecepWindow(QMainWindow):
         self.infoName.setPlaceholderText(
             "Ingresa tu nombre..."
         )
-        self.infoName.setMaxLength(10)
+        self.infoName.setMaxLength(80)
 
         self.infoEmail = QLineEdit("")
         self.infoEmail.setPlaceholderText(
@@ -605,13 +621,14 @@ class RecepWindow(QMainWindow):
         self.infoCedula.setPlaceholderText(
             "Ingresa tu cedula"
         )
-        self.infoCedula.setMaxLength(16)
+        self.infoCedula.setMaxLength(20)
 
         self.infoPassword = QLineEdit("")
         self.infoPassword.setPlaceholderText(
             "Ingresa tu contraseña..."
         )
-        self.infoPassword.setMaxLength(8)
+        self.infoPassword.setEchoMode(QLineEdit.Password)
+        self.infoPassword.setMaxLength(128)
 
         self.infoDir = QLineEdit("")
         self.infoDir.setPlaceholderText(
@@ -650,6 +667,25 @@ class RecepWindow(QMainWindow):
                 "Campos Vacios",
                 "Debes llenar todos los campos."
             )
+            return
+
+        error_validacion = validar_datos_cliente(
+            self.infoName.text(),
+            self.infoCedula.text(),
+            self.infoEmail.text(),
+            self.infoPassword.text(),
+            self.infoDir.text(),
+        )
+        if error_validacion:
+            QMessageBox.warning(self, "Datos inválidos", error_validacion)
+            return
+        error_duplicado = validar_cliente_unico(
+            self.clientes,
+            self.infoCedula.text(),
+            self.infoEmail.text(),
+        )
+        if error_duplicado:
+            QMessageBox.warning(self, "Cliente duplicado", error_duplicado)
             return
 
         self.newCl = {
@@ -741,19 +777,158 @@ class RecepWindow(QMainWindow):
             )
             return
 
-        monto, aceptado = QInputDialog.getText(
-            self,
-            "Solicitar prestamo",
-            f"Monto solicitado para {cliente['nombre']}:"
-        )
-        if not aceptado or not monto.strip():
+        if cliente.get("id") is None:
+            QMessageBox.critical(
+                self,
+                "Cliente no válido",
+                "No se pudo identificar al cliente seleccionado."
+            )
             return
 
-        QMessageBox.information(
-            self,
-            "Solicitud registrada",
-            f"La solicitud de prestamo por {monto.strip()} fue registrada."
+        dialogo = QDialog(self)
+        dialogo.setWindowTitle("Solicitar préstamo")
+        dialogo.setMinimumWidth(460)
+        dialogo.setStyleSheet("""
+            QDialog { background-color: #f5f6fa; }
+            QLabel { font-size: 14px; font-weight: normal; }
+            QDoubleSpinBox, QSpinBox {
+                background-color: white;
+                color: #1e293b;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                padding: 8px;
+                font-size: 15px;
+            }
+            QPushButton:disabled { background-color: #94a3b8; }
+        """)
+        formulario = QFormLayout(dialogo)
+        formulario.setContentsMargins(24, 24, 24, 24)
+        formulario.setSpacing(16)
+        formulario.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        nombre = QLabel(str(cliente["nombre"]))
+        nombre.setTextFormat(Qt.TextFormat.PlainText)
+        nombre.setWordWrap(True)
+        cedula = QLabel(str(cliente["cedula"]))
+        cedula.setTextFormat(Qt.TextFormat.PlainText)
+        formulario.addRow("Cliente:", nombre)
+        formulario.addRow("Cédula:", cedula)
+
+        ingreso_input = QDoubleSpinBox()
+        ingreso_input.setObjectName("ingresoMensualSolicitud")
+        ingreso_input.setRange(0, 100_000_000)
+        ingreso_input.setDecimals(2)
+        ingreso_input.setPrefix("C$ ")
+        ingreso_input.setSingleStep(100)
+        ingreso_input.setGroupSeparatorShown(True)
+        ingreso_input.setSpecialValueText("Ingresa el ingreso mensual")
+        ingreso_input.setKeyboardTracking(False)
+
+        monto_input = QDoubleSpinBox()
+        monto_input.setObjectName("montoSolicitud")
+        monto_input.setRange(0, 100_000_000)
+        monto_input.setDecimals(2)
+        monto_input.setPrefix("C$ ")
+        monto_input.setSingleStep(100)
+        monto_input.setGroupSeparatorShown(True)
+        monto_input.setSpecialValueText("Ingresa el monto")
+        monto_input.setKeyboardTracking(False)
+        plazo_input = QSpinBox()
+        plazo_input.setObjectName("cuotasSolicitud")
+        plazo_input.setRange(1, 360)
+        plazo_input.setSuffix(" cuotas")
+        plazo_input.setKeyboardTracking(False)
+
+        interes_label = QLabel()
+        interes_label.setObjectName("interesSolicitud")
+        total_label = QLabel()
+        total_label.setObjectName("totalSolicitud")
+        cuota_label = QLabel()
+        cuota_label.setObjectName("cuotaSolicitud")
+        aviso = QLabel(
+            "La solicitud quedará pendiente de aprobación por administración. "
+            "La cuota es estimada; el redondeo puede ajustar la última cuota."
         )
+        aviso.setWordWrap(True)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel
+        )
+        enviar = botones.button(QDialogButtonBox.Save)
+        enviar.setText("Enviar solicitud")
+        enviar.setAutoDefault(False)
+        botones.button(QDialogButtonBox.Cancel).setText("Cancelar")
+        botones.rejected.connect(dialogo.reject)
+
+        def actualizar_resumen():
+            monto = monto_input.value()
+            total = calcular_total_prestamo(monto)
+            interes_label.setText(f"C$ {calcular_interes(monto):,.2f}")
+            total_label.setText(f"C$ {total:,.2f}")
+            cuota_label.setText(f"C$ {total / plazo_input.value():,.2f}")
+            enviar.setEnabled(monto > 0 and ingreso_input.value() > 0)
+
+        def enviar_solicitud():
+            monto_input.interpretText()
+            plazo_input.interpretText()
+            ingreso_input.interpretText()
+            if monto_input.value() <= 0:
+                QMessageBox.warning(
+                    dialogo, "Monto inválido", "Ingresa un monto mayor que cero."
+                )
+                monto_input.setFocus()
+                return
+            if ingreso_input.value() <= 0:
+                QMessageBox.warning(
+                    dialogo,
+                    "Ingreso inválido",
+                    "Ingresa el ingreso mensual del cliente, mayor que cero."
+                )
+                ingreso_input.setFocus()
+                return
+            enviar.setEnabled(False)
+            try:
+                solicitud_id = crear_solicitud_prestamo(
+                    int(cliente["id"]),
+                    monto_input.value(),
+                    plazo_input.value(),
+                    ingreso_mensual=ingreso_input.value(),
+                )
+            except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+                QMessageBox.critical(
+                    dialogo,
+                    "Error al registrar solicitud",
+                    f"No se pudo guardar la solicitud: {error}"
+                )
+                enviar.setEnabled(True)
+                return
+
+            dialogo.accept()
+            QMessageBox.information(
+                self,
+                "Solicitud registrada",
+                f"Solicitud #{solicitud_id} para {cliente['nombre']}.\n"
+                f"Monto: C$ {monto_input.value():,.2f}\n"
+                f"Ingreso mensual: C$ {ingreso_input.value():,.2f}\n"
+                f"Plazo: {plazo_input.value()} cuotas\n"
+                "Estado: Pendiente de aprobación por administración."
+            )
+
+        monto_input.valueChanged.connect(actualizar_resumen)
+        ingreso_input.valueChanged.connect(actualizar_resumen)
+        plazo_input.valueChanged.connect(actualizar_resumen)
+        botones.accepted.connect(enviar_solicitud)
+        formulario.addRow("Ingreso mensual del cliente:", ingreso_input)
+        formulario.addRow("Monto solicitado:", monto_input)
+        formulario.addRow("Plazo:", plazo_input)
+        formulario.addRow(f"Interés ({PORCENTAJE_INTERES:.0f}%):", interes_label)
+        formulario.addRow("Total a pagar:", total_label)
+        formulario.addRow("Cuota estimada:", cuota_label)
+        formulario.addRow(aviso)
+        formulario.addRow(botones)
+        actualizar_resumen()
+        monto_input.setFocus()
+        dialogo.exec()
 
     def abonarPrestamo(self):
         cliente = self.clienteSeleccionado()
@@ -794,20 +969,49 @@ class RecepWindow(QMainWindow):
         )
 
     def verCitas(self):
-        cliente = self.clienteSeleccionado()
-        if cliente is None:
-            QMessageBox.warning(
+        try:
+            citas = listar_todas_las_citas()
+        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            QMessageBox.critical(
                 self,
-                "Cliente no seleccionado",
-                "Selecciona un cliente para ver sus citas."
+                "Error al consultar citas",
+                f"No se pudieron cargar las citas: {error}"
             )
             return
 
-        QMessageBox.information(
-            self,
-            "Citas",
-            f"No hay citas registradas para {cliente['nombre']}."
+        if not citas:
+            QMessageBox.information(self, "Citas", "No hay citas registradas.")
+            return
+
+        dialogo = QDialog(self)
+        dialogo.setWindowTitle("Citas agendadas")
+        dialogo.resize(720, 420)
+        layout = QVBoxLayout(dialogo)
+        tabla = QTableWidget(len(citas), 5)
+        tabla.setHorizontalHeaderLabels(
+            ["ID", "Cliente", "Cédula", "Fecha", "Estado"]
         )
+        tabla.setSelectionBehavior(QAbstractItemView.SelectRows)
+        tabla.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        tabla.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        for fila, cita in enumerate(citas):
+            valores = (
+                str(cita["id"]),
+                cita["nombre"],
+                cita["cedula"],
+                cita["fecha"].strftime("%d/%m/%Y"),
+                cita["estado"],
+            )
+            for columna, valor in enumerate(valores):
+                tabla.setItem(fila, columna, QTableWidgetItem(valor))
+        layout.addWidget(tabla)
+
+        botones = QHBoxLayout()
+        btn_cerrar = QPushButton("Cerrar")
+        botones.addWidget(btn_cerrar)
+        layout.addLayout(botones)
+        btn_cerrar.clicked.connect(dialogo.accept)
+        dialogo.exec()
 
     def ReporteCartera(self):
         try:
@@ -873,6 +1077,8 @@ class RecepWindow(QMainWindow):
             prestamos_por_cliente[cliente["cedula"]].append({
                 "id": prestamo["id"],
                 "monto": f"C$ {float(prestamo['monto']):,.2f}",
+                "interes": f"C$ {calcular_interes(prestamo['monto']):,.2f}",
+                "total": f"C$ {calcular_total_prestamo(prestamo['monto']):,.2f}",
                 "plazo": f"{prestamo['plazo']} cuotas",
                 "estado": prestamo["estado"],
             })
