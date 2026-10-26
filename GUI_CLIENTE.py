@@ -211,7 +211,7 @@ class ClienteWindow(QMainWindow):
             "Monto inicial",
             f"Interés ({PORCENTAJE_INTERES:.0f}%)",
             "Total a pagar",
-            "Plazo",
+            "Cuotas pendientes",
             "Estado"
         ])
 
@@ -326,7 +326,7 @@ class ClienteWindow(QMainWindow):
                 f"C$ {float(prestamo['monto']):,.2f}",
                 f"C$ {calcular_interes(prestamo['monto']):,.2f}",
                 f"C$ {calcular_total_prestamo(prestamo['monto']):,.2f}",
-                f"{prestamo['plazo']} cuotas",
+                f"{prestamo['cuotas_pendientes']} cuotas",
                 prestamo["estado"],
             )
             for columna, valor in enumerate(valores):

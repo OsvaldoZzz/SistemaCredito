@@ -2,12 +2,15 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
+from pathlib import Path
 from mysql.connector import Error as MySQLConnectorError
 from clientes_crud import crear_cliente, listar_clientes
 from citas_crud import (
     listar_todas_las_citas,
 )
 from prestamos_crud import listar_prestamos, listar_todos_los_prestamos
+from pagos_ui import abrir_dialogo_abono
+from prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
 from reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 from solicitudes_crud import crear_solicitud_prestamo
 from validaciones import validar_cliente_unico, validar_datos_cliente
@@ -139,6 +142,10 @@ class RecepWindow(QMainWindow):
                 border-radius: 10px;
             }
 
+            QWidget#panelAcciones {
+                background-color: white;
+            }
+
             /* TABLA */
 
             QTableWidget {
@@ -156,6 +163,52 @@ class RecepWindow(QMainWindow):
                 padding: 10px;
                 border: none;
                 font-weight: bold;
+            }
+
+            QPushButton#acciones {
+                background-color: #f8fafc;
+                color: #1e293b;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 2px;
+                min-width: 0px;
+                min-height: 0px;
+            }
+
+            QPushButton#acciones:hover {
+                background-color: #dbeafe;
+                border-color: #60a5fa;
+            }
+
+            QDialog#detallePrestamo {
+                background-color: #f8fafc;
+            }
+
+            QLabel#notaPrestamo {
+                background-color: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 8px;
+                padding: 10px;
+                color: #1e3a8a;
+                font-size: 13px;
+            }
+
+            QLabel#resumenPrestamo {
+                background-color: white;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 10px;
+                color: #1e293b;
+                font-size: 14px;
+            }
+
+            QTableWidget#tablaDetallePrestamo {
+                background-color: white;
+                alternate-background-color: #f8fafc;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                gridline-color: #e2e8f0;
+                font-size: 13px;
             }
 
             /* BOTONES */
@@ -360,7 +413,7 @@ class RecepWindow(QMainWindow):
 
         self.tablaPrestamos = QTableWidget()
 
-        self.tablaPrestamos.setColumnCount(6)
+        self.tablaPrestamos.setColumnCount(7)
         self.tablaPrestamos.setEditTriggers(
             QAbstractItemView.NoEditTriggers
         )
@@ -373,8 +426,9 @@ class RecepWindow(QMainWindow):
             "Monto inicial",
             f"Interés ({PORCENTAJE_INTERES:.0f}%)",
             "Total a pagar",
-            "Plazo",
-            "Estado"
+            "Cuotas pendientes",
+            "Estado",
+            "Acciones",
         ])
 
         self.tablaPrestamos.setObjectName("tablaPrestamos")
@@ -383,6 +437,9 @@ class RecepWindow(QMainWindow):
 
         self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch
+        )
+        self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
+            6, QHeaderView.ResizeToContents
         )
 
         prestamosLayout.addWidget(
@@ -558,13 +615,56 @@ class RecepWindow(QMainWindow):
                 f"C$ {float(prestamo['monto']):,.2f}",
                 f"C$ {calcular_interes(prestamo['monto']):,.2f}",
                 f"C$ {calcular_total_prestamo(prestamo['monto']):,.2f}",
-                f"{prestamo['plazo']} cuotas",
+                f"{prestamo['cuotas_pendientes']} cuotas",
                 prestamo["estado"],
             )
             for columna, valor in enumerate(valores):
                 self.tablaPrestamos.setItem(
                     fila, columna, QTableWidgetItem(valor)
                 )
+            self.agregarAccionVerPrestamo(fila)
+            self.tablaPrestamos.setRowHeight(fila, 42)
+
+    def agregarAccionVerPrestamo(self, fila):
+        acciones = QWidget()
+        acciones.setObjectName("panelAcciones")
+        layout = QHBoxLayout(acciones)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        boton_ver = QPushButton()
+        boton_ver.setObjectName("acciones")
+        boton_ver.setFixedSize(34, 34)
+        boton_ver.setIcon(
+            QIcon(str(Path(__file__).resolve().parent / "img" / "ver.png"))
+        )
+        boton_ver.setIconSize(QSize(25, 25))
+        boton_ver.setToolTip("Ver cuotas, pagos y mora")
+        boton_ver.clicked.connect(self.verPrestamoDesdeBoton)
+        layout.addWidget(boton_ver)
+        self.tablaPrestamos.setCellWidget(fila, 6, acciones)
+
+    def verPrestamoDesdeBoton(self):
+        boton = self.sender()
+        contenedor = boton.parentWidget() if boton is not None else None
+        fila = next(
+            (
+                indice
+                for indice in range(self.tablaPrestamos.rowCount())
+                if self.tablaPrestamos.cellWidget(indice, 6) is contenedor
+            ),
+            -1,
+        )
+        if fila < 0:
+            return
+
+        id_item = self.tablaPrestamos.item(fila, 0)
+        if id_item is None:
+            return
+        try:
+            mostrar_detalle_prestamo(self, int(id_item.text()))
+        except (MySQLConnectorError, OSError, TypeError, ValueError) as error:
+            mostrar_error_detalle_prestamo(self, error)
 
     # ==========================================================
     # BOTÓN CREAR CLIENTE
@@ -580,29 +680,47 @@ class RecepWindow(QMainWindow):
         layoutCC.setObjectName("formCC")
 
         layoutCC.setStyleSheet("""
-            #formCC {
-                background-color: #f5f5f5;
-            }
+    QWidget#formCC {
+        background-color: #f8fafc;
+    }
 
-            QLineEdit {
-                background-color: #D3D3D3;
-                color: #000;
-            }
+    QLineEdit {
+        background-color: white;
+        color: #1e293b;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14px;
+        selection-background-color: #bfdbfe;
+        selection-color: #1e293b;
+    }
 
-            QPushButton {
-                background-color: #3B82F6;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 10px;
-                font-size: 14px;
-                font-weight: bold;
-            }
+    QLineEdit:hover {
+        border-color: #94a3b8;
+    }
 
-            QPushButton:hover {
-                background-color: green;
-            }
-        """)
+    QLineEdit:focus {
+        border-color: #3b82f6;
+    }
+
+    QPushButton#btnEnviar {
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    QPushButton#btnEnviar:hover {
+        background-color: #1d4ed8;
+    }
+
+    QPushButton#btnEnviar:pressed {
+        background-color: #1e40af;
+    }
+""")
 
         form_layout = QFormLayout(layoutCC)
 
@@ -786,20 +904,111 @@ class RecepWindow(QMainWindow):
             return
 
         dialogo = QDialog(self)
+        dialogo.setObjectName("solicitudPrestamo")
         dialogo.setWindowTitle("Solicitar préstamo")
-        dialogo.setMinimumWidth(460)
+        dialogo.setMinimumWidth(520)
         dialogo.setStyleSheet("""
-            QDialog { background-color: #f5f6fa; }
-            QLabel { font-size: 14px; font-weight: normal; }
-            QDoubleSpinBox, QSpinBox {
+            QDialog#solicitudPrestamo {
+                background-color: #f8fafc;
+                color: #1e293b;
+            }
+
+            QDialog#solicitudPrestamo QLabel {
+                color: #334155;
+                font-size: 14px;
+                font-weight: normal;
+            }
+
+            QDialog#solicitudPrestamo QLabel#clienteSolicitud {
+                color: #1e293b;
+                font-size: 15px;
+                font-weight: bold;
+            }
+
+            QDialog#solicitudPrestamo QDoubleSpinBox,
+            QDialog#solicitudPrestamo QSpinBox {
                 background-color: white;
                 color: #1e293b;
-                border: 1px solid #d1d5db;
-                border-radius: 6px;
-                padding: 8px;
-                font-size: 15px;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 9px 10px;
+                font-size: 14px;
+                selection-background-color: #bfdbfe;
+                selection-color: #1e293b;
             }
-            QPushButton:disabled { background-color: #94a3b8; }
+
+            QDialog#solicitudPrestamo QDoubleSpinBox:hover,
+            QDialog#solicitudPrestamo QSpinBox:hover {
+                border-color: #94a3b8;
+            }
+
+            QDialog#solicitudPrestamo QDoubleSpinBox:focus,
+            QDialog#solicitudPrestamo QSpinBox:focus {
+                border: 1px solid #3b82f6;
+            }
+
+            QDialog#solicitudPrestamo QLabel#interesSolicitud,
+            QDialog#solicitudPrestamo QLabel#totalSolicitud,
+            QDialog#solicitudPrestamo QLabel#cuotaSolicitud {
+                background-color: white;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 9px 10px;
+                color: #1e293b;
+                font-size: 14px;
+                font-weight: bold;
+            }
+
+            QDialog#solicitudPrestamo QLabel#totalSolicitud {
+                background-color: #eff6ff;
+                border-color: #bfdbfe;
+                color: #1d4ed8;
+            }
+
+            QDialog#solicitudPrestamo QLabel#avisoSolicitud {
+                background-color: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 8px;
+                padding: 10px;
+                color: #1e3a8a;
+                font-size: 13px;
+            }
+
+            QDialog#solicitudPrestamo QPushButton {
+                min-width: 110px;
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+
+            QDialog#solicitudPrestamo QPushButton#btnEnviarSolicitud {
+                background-color: #2563eb;
+                color: white;
+                border: 1px solid #2563eb;
+            }
+
+            QDialog#solicitudPrestamo QPushButton#btnEnviarSolicitud:hover {
+                background-color: #1d4ed8;
+                border-color: #1d4ed8;
+            }
+
+            QDialog#solicitudPrestamo QPushButton#btnCancelarSolicitud {
+                background-color: white;
+                color: #334155;
+                border: 1px solid #cbd5e1;
+            }
+
+            QDialog#solicitudPrestamo QPushButton#btnCancelarSolicitud:hover {
+                background-color: #f1f5f9;
+                border-color: #94a3b8;
+            }
+
+            QDialog#solicitudPrestamo QPushButton:disabled {
+                background-color: #94a3b8;
+                border-color: #94a3b8;
+                color: white;
+            }
         """)
         formulario = QFormLayout(dialogo)
         formulario.setContentsMargins(24, 24, 24, 24)
@@ -807,9 +1016,11 @@ class RecepWindow(QMainWindow):
         formulario.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         nombre = QLabel(str(cliente["nombre"]))
+        nombre.setObjectName("clienteSolicitud")
         nombre.setTextFormat(Qt.TextFormat.PlainText)
         nombre.setWordWrap(True)
         cedula = QLabel(str(cliente["cedula"]))
+        cedula.setObjectName("clienteSolicitud")
         cedula.setTextFormat(Qt.TextFormat.PlainText)
         formulario.addRow("Cliente:", nombre)
         formulario.addRow("Cédula:", cedula)
@@ -849,15 +1060,19 @@ class RecepWindow(QMainWindow):
             "La solicitud quedará pendiente de aprobación por administración. "
             "La cuota es estimada; el redondeo puede ajustar la última cuota."
         )
+        aviso.setObjectName("avisoSolicitud")
         aviso.setWordWrap(True)
 
         botones = QDialogButtonBox(
             QDialogButtonBox.Save | QDialogButtonBox.Cancel
         )
         enviar = botones.button(QDialogButtonBox.Save)
+        enviar.setObjectName("btnEnviarSolicitud")
         enviar.setText("Enviar solicitud")
         enviar.setAutoDefault(False)
-        botones.button(QDialogButtonBox.Cancel).setText("Cancelar")
+        cancelar = botones.button(QDialogButtonBox.Cancel)
+        cancelar.setObjectName("btnCancelarSolicitud")
+        cancelar.setText("Cancelar")
         botones.rejected.connect(dialogo.reject)
 
         def actualizar_resumen():
@@ -948,25 +1163,21 @@ class RecepWindow(QMainWindow):
             )
             return
 
-        monto, aceptado = QInputDialog.getDouble(
-            self,
-            "Abonar prestamo",
-            "Monto del abono:",
-            0.0,
-            0.01,
-            100000000.0,
-            2
-        )
-        if not aceptado:
+        id_item = self.tablaPrestamos.item(fila, 0)
+        if id_item is None:
             return
 
-        id_item = self.tablaPrestamos.item(fila, 0)
-        QMessageBox.information(
-            self,
-            "Abono registrado",
-            f"Se registro un abono de C$ {monto:,.2f} "
-            f"para el prestamo {id_item.text()} de {cliente['nombre']}."
-        )
+        try:
+            registrado = abrir_dialogo_abono(self, int(id_item.text()))
+        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            QMessageBox.critical(
+                self,
+                "Error al registrar abono",
+                f"No se pudo registrar el abono: {error}",
+            )
+            return
+        if registrado:
+            self.cargarPrestamosCliente(cliente)
 
     def verCitas(self):
         try:

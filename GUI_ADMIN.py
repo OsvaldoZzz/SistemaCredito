@@ -1,6 +1,7 @@
+from datetime import date
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QDate, QSize, Qt
 from PySide6.QtWidgets import QHeaderView
 from pathlib import Path
 from mysql.connector import Error as MySQLConnectorError
@@ -13,6 +14,8 @@ from prestamos_crud import (
     listar_prestamos,
     listar_todos_los_prestamos,
 )
+from pagos_ui import abrir_dialogo_abono
+from prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
 from solicitudes_crud import (
     listar_solicitudes_pendientes,
     resolver_solicitud_prestamo,
@@ -195,26 +198,78 @@ class AdminWindow(QMainWindow):
                 font-weight: bold;
             }
 
-            QPushButton#acciones{
+            QWidget#panelAcciones {
                 background-color: white;
-                color: #000;
-                padding: 2px;
-                min-width: 32px;
-                min-height: 32px;
             }
 
-            QPushButton:hover#acciones{
-                background-color: #e8f0fe;
-                }
+            QPushButton#acciones {
+                background-color: #f8fafc;
+                color: #1e293b;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 2px;
+                min-width: 0px;
+                min-height: 0px;
+            }
+
+            QPushButton#acciones[tipoAccion="ver"]:hover {
+                background-color: #dbeafe;
+                border-color: #60a5fa;
+            }
+
+            QPushButton#acciones[tipoAccion="editar"]:hover {
+                background-color: #fef3c7;
+                border-color: #fbbf24;
+            }
+
+            QPushButton#acciones[tipoAccion="eliminar"]:hover {
+                background-color: #fee2e2;
+                border-color: #f87171;
+            }
+
+            QPushButton#acciones:pressed {
+                background-color: #e2e8f0;
+                border-color: #94a3b8;
+            }
+
+            QDialog#detallePrestamo {
+                background-color: #f8fafc;
+            }
+
+            QLabel#notaPrestamo {
+                background-color: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 8px;
+                padding: 10px;
+                color: #1e3a8a;
+                font-size: 13px;
+            }
+
+            QLabel#resumenPrestamo {
+                background-color: white;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 10px;
+                color: #1e293b;
+                font-size: 14px;
+            }
+
+            QTableWidget#tablaDetallePrestamo {
+                background-color: white;
+                alternate-background-color: #f8fafc;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                gridline-color: #e2e8f0;
+                font-size: 13px;
+            }
 
             QPushButton:hover {
                 background-color: #2563eb;
             }
 
             QPushButton#btnAcciones {
-                background-color: #4f46e5;
+                background-color: #3B82F6;
                 color: white;
-                border: 1px solid #4338ca;
                 border-radius: 8px;
                 padding: 10px 16px;
                 font-weight: bold;
@@ -387,16 +442,12 @@ class AdminWindow(QMainWindow):
         self.btnAcciones.setObjectName("btnAcciones")
         self.btnAcciones.clicked.connect(self.accionesAdmin)
 
-        self.btnActualizar = QPushButton("Actualizar datos")
-        self.btnActualizar.clicked.connect(self.actualizarDatos)
-
         self.btnCerrar = QPushButton("Cerrar Sesion")
         self.btnCerrar.setObjectName("cerrarSesion")
 
         self.btnCerrar.clicked.connect(self.btnCerrSes)
 
         botonesLayout.addWidget(self.btnAcciones)
-        botonesLayout.addWidget(self.btnActualizar)
         botonesLayout.addWidget(self.btnCerrar)
 
         clientesLayout.addLayout(botonesLayout)
@@ -449,7 +500,7 @@ class AdminWindow(QMainWindow):
             "Monto inicial",
             f"Interés ({PORCENTAJE_INTERES:.0f}%)",
             "Total a pagar",
-            "Plazo",
+            "Cuotas pendientes",
             "Estado",
             "Acciones"
         ])
@@ -459,7 +510,9 @@ class AdminWindow(QMainWindow):
         self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch
         )
-        self.tablaPrestamos.setColumnWidth(6, 120)
+        self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
+            6, QHeaderView.ResizeToContents
+        )
 
 
         prestamosLayout.addWidget(self.tablaPrestamos, 1)
@@ -562,7 +615,7 @@ class AdminWindow(QMainWindow):
                 f"C$ {float(monto):,.2f}",
                 f"C$ {interes:,.2f}",
                 f"C$ {total:,.2f}",
-                f"{prestamo['plazo']} cuotas",
+                f"{prestamo['cuotas_pendientes']} cuotas",
                 str(prestamo["estado"]),
             )
             for columna, valor in enumerate(valores):
@@ -571,6 +624,14 @@ class AdminWindow(QMainWindow):
                     columna,
                     QTableWidgetItem(valor)
                 )
+            self.tablaPrestamos.item(fila, 0).setData(
+                Qt.ItemDataRole.UserRole,
+                prestamo["fecha_primer_pago"].isoformat(),
+            )
+            self.tablaPrestamos.item(fila, 4).setData(
+                Qt.ItemDataRole.UserRole + 1,
+                prestamo["plazo"],
+            )
             self.agregarAccionesPrestamo(fila)
             self.tablaPrestamos.setRowHeight(fila, 42)
 
@@ -618,6 +679,7 @@ class AdminWindow(QMainWindow):
         btn_eliminar.setObjectName("eliminar_cliente")
         btn_crearRol = QPushButton("Crear Rol")
         btn_eliminarRol = QPushButton("Eliminar Rol")
+        btn_actualizar = QPushButton("Actualizar datos")
         btn_cancelar = QPushButton("Cancelar")
 
         accion_seleccionada = {"tipo": None}
@@ -638,13 +700,17 @@ class AdminWindow(QMainWindow):
         btn_eliminarRol.clicked.connect(
             lambda: seleccionar_accion("eliminarRol")
         )
+        btn_actualizar.clicked.connect(
+            lambda: seleccionar_accion("actualizar")
+        )
         btn_cancelar.clicked.connect(dialogo.reject)
 
         layout.addWidget(btn_crear, 0, 0)
         layout.addWidget(btn_crearRol, 0, 1)
         layout.addWidget(btn_eliminar, 1, 0)
         layout.addWidget(btn_eliminarRol, 1, 1)
-        layout.addWidget(btn_cancelar, 2, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(btn_actualizar, 2, 0, 1, 2)
+        layout.addWidget(btn_cancelar, 3, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
 
         dialogo.exec()
 
@@ -656,6 +722,8 @@ class AdminWindow(QMainWindow):
             self.crearRol()
         elif accion_seleccionada["tipo"] == "eliminarRol":
             self.eliminarRol()
+        elif accion_seleccionada["tipo"] == "actualizar":
+            self.actualizarDatos()
 
     def actualizarDatos(self):
         cliente_actual = self.clienteSeleccionado()
@@ -774,29 +842,47 @@ class AdminWindow(QMainWindow):
         layoutCC.setObjectName("formCC")
 
         layoutCC.setStyleSheet("""
-            #formCC {
-                background-color: #f5f5f5;
-            }
+    QWidget#formCC {
+        background-color: #f8fafc;
+    }
 
-            QLineEdit {
-                background-color: #D3D3D3;
-                color: #000;
-            }
+    QLineEdit {
+        background-color: white;
+        color: #1e293b;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14px;
+        selection-background-color: #bfdbfe;
+        selection-color: #1e293b;
+    }
 
-            QPushButton {
-                background-color: #3B82F6;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 10px;
-                font-size: 14px;
-                font-weight: bold;
-            }
+    QLineEdit:hover {
+        border-color: #94a3b8;
+    }
 
-            QPushButton:hover {
-                background-color: green;
-            }
-        """)
+    QLineEdit:focus {
+        border-color: #3b82f6;
+    }
+
+    QPushButton#btnEnviar {
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    QPushButton#btnEnviar:hover {
+        background-color: #1d4ed8;
+    }
+
+    QPushButton#btnEnviar:pressed {
+        background-color: #1e40af;
+    }
+""")
 
         form_layout = QFormLayout(layoutCC)
 
@@ -1024,13 +1110,26 @@ class AdminWindow(QMainWindow):
 
     def agregarAccionesPrestamo(self, fila):
         acciones = QWidget()
+        acciones.setObjectName("panelAcciones")
         acciones_layout = QHBoxLayout(acciones)
         acciones_layout.setContentsMargins(4, 2, 4, 2)
         acciones_layout.setSpacing(6)
         acciones_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        boton_ver = QPushButton()
+        boton_ver.setObjectName("acciones")
+        boton_ver.setProperty("tipoAccion", "ver")
+        boton_ver.setFixedSize(34, 34)
+        boton_ver.setIcon(
+            QIcon(str(Path(__file__).resolve().parent / "img" / "ver.png"))
+        )
+        boton_ver.setIconSize(QSize(25, 25))
+        boton_ver.setToolTip("Ver préstamo")
+        boton_ver.clicked.connect(self.verPrestamoDesdeBoton)
+
         boton_editar = QPushButton()
         boton_editar.setObjectName("acciones")
+        boton_editar.setProperty("tipoAccion", "editar")
         boton_editar.setFixedSize(34, 34)
         boton_editar.setIcon(
             QIcon(str(Path(__file__).resolve().parent / "img" / "editar.png"))
@@ -1050,11 +1149,14 @@ class AdminWindow(QMainWindow):
                 QStyle.StandardPixmap.SP_TrashIcon
             )
         boton_eliminar.setFixedSize(34, 34)
+        boton_eliminar.setObjectName("acciones")
+        boton_eliminar.setProperty("tipoAccion", "eliminar")
         boton_eliminar.setIcon(icono_basurita)
         boton_eliminar.setIconSize(QSize(25, 25))
         boton_eliminar.setToolTip("Eliminar préstamo")
         boton_eliminar.clicked.connect(self.eliminarPrestamoDesdeBoton)
 
+        acciones_layout.addWidget(boton_ver)
         acciones_layout.addWidget(boton_editar)
         acciones_layout.addWidget(boton_eliminar)
         self.tablaPrestamos.setCellWidget(fila, 6, acciones)
@@ -1065,6 +1167,20 @@ class AdminWindow(QMainWindow):
             if self.tablaPrestamos.cellWidget(fila, 6) is contenedor:
                 return fila
         return -1
+
+    def verPrestamoDesdeBoton(self):
+        fila = self.filaDeAccion(self.sender())
+        if fila < 0:
+            return
+
+        id_item = self.tablaPrestamos.item(fila, 0)
+        if id_item is None:
+            return
+
+        try:
+            mostrar_detalle_prestamo(self, int(id_item.text()))
+        except (MySQLConnectorError, OSError, TypeError, ValueError) as error:
+            mostrar_error_detalle_prestamo(self, error)
 
     def editarPrestamoDesdeBoton(self):
         fila = self.filaDeAccion(self.sender())
@@ -1204,8 +1320,16 @@ class AdminWindow(QMainWindow):
         )
         plazo_input = QSpinBox()
         plazo_input.setRange(1, 360)
+        plazo_original = plazo_item.data(Qt.ItemDataRole.UserRole + 1)
+        if plazo_original is None:
+            plazo_original = int(
+                plazo_item.text().split(" de ", 1)[-1]
+                .casefold()
+                .replace("cuotas", "")
+                .strip()
+            )
         plazo_input.setValue(
-            int(plazo_item.text().casefold().replace("cuotas", "").strip())
+            int(plazo_original)
         )
         estado_input = QComboBox()
         estados = ["Activo", "Pagado", "Vencido"]
@@ -1262,16 +1386,7 @@ class AdminWindow(QMainWindow):
             self.cargarPrestamosCliente(self.cliente_cedula)
             return
 
-        monto_item.setText(f"C$ {monto_input.value():,.2f}")
-        self.tablaPrestamos.item(fila, 2).setText(
-            f"C$ {calcular_interes(monto_input.value()):,.2f}"
-        )
-        self.tablaPrestamos.item(fila, 3).setText(
-            f"C$ {calcular_total_prestamo(monto_input.value()):,.2f}"
-        )
-        plazo_item.setText(f"{plazo_input.value()} cuotas")
-        estado_item.setText(estado_input.currentText())
-        self.guardarPrestamosCliente()
+        self.cargarPrestamosCliente(self.cliente_cedula)
 
         QMessageBox.information(
             self,
@@ -1300,17 +1415,118 @@ class AdminWindow(QMainWindow):
             return
 
         dialogo = QDialog(self)
+        dialogo.setObjectName("crearPrestamo")
         dialogo.setWindowTitle("Crear prestamo")
+        dialogo.setMinimumWidth(500)
+        dialogo.setStyleSheet("""
+            QDialog#crearPrestamo {
+                background-color: #f8fafc;
+                color: #1e293b;
+            }
+
+            QDialog#crearPrestamo QLabel {
+                color: #334155;
+                font-size: 14px;
+            }
+
+            QDialog#crearPrestamo QDoubleSpinBox,
+            QDialog#crearPrestamo QSpinBox,
+            QDialog#crearPrestamo QDateEdit {
+                background-color: white;
+                color: #1e293b;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 9px 10px;
+                font-size: 14px;
+                selection-background-color: #bfdbfe;
+                selection-color: #1e293b;
+            }
+
+            QDialog#crearPrestamo QDoubleSpinBox:hover,
+            QDialog#crearPrestamo QSpinBox:hover,
+            QDialog#crearPrestamo QDateEdit:hover {
+                border-color: #94a3b8;
+            }
+
+            QDialog#crearPrestamo QDoubleSpinBox:focus,
+            QDialog#crearPrestamo QSpinBox:focus,
+            QDialog#crearPrestamo QDateEdit:focus {
+                border: 1px solid #3b82f6;
+            }
+
+            QDialog#crearPrestamo QLabel#resumenPrestamo,
+            QDialog#crearPrestamo QLabel#totalPrestamo {
+                background-color: white;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 9px 10px;
+                color: #1e293b;
+                font-weight: bold;
+            }
+
+            QDialog#crearPrestamo QLabel#totalPrestamo {
+                background-color: #eff6ff;
+                border: 1px solid #bfdbfe;
+                color: #1d4ed8;
+                font-size: 15px;
+            }
+
+            QDialog#crearPrestamo QLabel#ayudaPrestamo {
+                background-color: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 8px;
+                padding: 10px;
+                color: #1e3a8a;
+                font-size: 13px;
+            }
+
+            QDialog#crearPrestamo QPushButton {
+                min-width: 110px;
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+
+            QDialog#crearPrestamo QPushButton#btnGuardarPrestamo {
+                background-color: #2563eb;
+                color: white;
+                border: 1px solid #2563eb;
+            }
+
+            QDialog#crearPrestamo QPushButton#btnGuardarPrestamo:hover {
+                background-color: #1d4ed8;
+                border-color: #1d4ed8;
+            }
+
+            QDialog#crearPrestamo QPushButton#btnCancelarPrestamo {
+                background-color: white;
+                color: #334155;
+                border: 1px solid #cbd5e1;
+            }
+
+            QDialog#crearPrestamo QPushButton#btnCancelarPrestamo:hover {
+                background-color: #f1f5f9;
+                border-color: #94a3b8;
+            }
+        """)
         formulario = QFormLayout(dialogo)
+        formulario.setContentsMargins(24, 24, 24, 24)
+        formulario.setSpacing(14)
+        formulario.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         monto_input = QDoubleSpinBox()
+        monto_input.setObjectName("montoPrestamo")
         monto_input.setRange(0.01, 100_000_000)
         monto_input.setDecimals(2)
         monto_input.setPrefix("C$ ")
+        monto_input.setGroupSeparatorShown(True)
         interes_preview = QLabel(f"C$ {calcular_interes(monto_input.value()):,.2f}")
+        interes_preview.setObjectName("resumenPrestamo")
         total_preview = QLabel(
             f"C$ {calcular_total_prestamo(monto_input.value()):,.2f}"
         )
+        total_preview.setObjectName("totalPrestamo")
         monto_input.valueChanged.connect(
             lambda valor: interes_preview.setText(
                 f"C$ {calcular_interes(valor):,.2f}"
@@ -1322,10 +1538,29 @@ class AdminWindow(QMainWindow):
             )
         )
         plazo_input = QSpinBox()
+        plazo_input.setObjectName("plazoPrestamo")
         plazo_input.setRange(1, 360)
+        plazo_input.setSuffix(" cuotas")
+        fecha_primer_pago_input = QDateEdit()
+        fecha_primer_pago_input.setObjectName("fechaPrimerPagoPrestamo")
+        fecha_primer_pago_input.setCalendarPopup(True)
+        fecha_primer_pago_input.setMinimumDate(QDate.currentDate())
+        fecha_primer_pago_input.setDate(QDate.currentDate().addMonths(1))
+        fecha_primer_pago_input.setDisplayFormat("dd/MM/yyyy")
+        ayuda = QLabel(
+            "Las próximas cuotas vencerán mensualmente en esta misma fecha."
+        )
+        ayuda.setObjectName("ayudaPrestamo")
+        ayuda.setWordWrap(True)
         botones = QDialogButtonBox(
             QDialogButtonBox.Save | QDialogButtonBox.Cancel
         )
+        guardar = botones.button(QDialogButtonBox.Save)
+        guardar.setObjectName("btnGuardarPrestamo")
+        guardar.setText("Crear préstamo")
+        cancelar = botones.button(QDialogButtonBox.Cancel)
+        cancelar.setObjectName("btnCancelarPrestamo")
+        cancelar.setText("Cancelar")
         botones.accepted.connect(dialogo.accept)
         botones.rejected.connect(dialogo.reject)
 
@@ -1333,6 +1568,8 @@ class AdminWindow(QMainWindow):
         formulario.addRow(f"Interés ({PORCENTAJE_INTERES:.0f}%):", interes_preview)
         formulario.addRow("Total a pagar:", total_preview)
         formulario.addRow("Plazo:", plazo_input)
+        formulario.addRow("Fecha de la primera cuota:", fecha_primer_pago_input)
+        formulario.addRow(ayuda)
         formulario.addRow(botones)
 
         if dialogo.exec() != QDialog.Accepted:
@@ -1345,6 +1582,9 @@ class AdminWindow(QMainWindow):
                 int(cliente["id"]),
                 monto_input.value(),
                 plazo_input.value(),
+                fecha_primer_pago=date.fromisoformat(
+                    fecha_primer_pago_input.date().toString("yyyy-MM-dd")
+                ),
             )
         except (ValueError, TypeError) as error:
             QMessageBox.warning(
@@ -1380,24 +1620,20 @@ class AdminWindow(QMainWindow):
             return
 
         id_item = self.tablaPrestamos.item(fila, 0)
-        monto, aceptado = QInputDialog.getDouble(
-            self,
-            "Abonar prestamo",
-            "Monto del abono:",
-            0.0,
-            0.01,
-            100000000.0,
-            2
-        )
-        if not aceptado:
+        if id_item is None:
             return
 
-        QMessageBox.information(
-            self,
-            "Abono registrado",
-            f"Se registro un abono de C$ {monto:,.2f} "
-            f"para el prestamo {id_item.text()}."
-        )
+        try:
+            registrado = abrir_dialogo_abono(self, int(id_item.text()))
+        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            QMessageBox.critical(
+                self,
+                "Error al registrar abono",
+                f"No se pudo registrar el abono: {error}",
+            )
+            return
+        if registrado:
+            self.cargarPrestamosCliente(self.cliente_cedula)
 
     def verSolicitudes(self):
         try:
@@ -1417,10 +1653,106 @@ class AdminWindow(QMainWindow):
             return
 
         dialogo = QDialog(self)
+        dialogo.setObjectName("solicitudesPrestamo")
         dialogo.setWindowTitle("Solicitudes de préstamo")
         dialogo.resize(1000, 440)
+        dialogo.setStyleSheet("""
+            QDialog#solicitudesPrestamo {
+                background-color: #f8fafc;
+                color: #1e293b;
+            }
+
+            QDialog#solicitudesPrestamo QLabel {
+                color: #334155;
+                font-size: 14px;
+            }
+
+            QDialog#solicitudesPrestamo QLabel#fechaPrimeraCuota {
+                color: #1e3a8a;
+                font-weight: bold;
+            }
+
+            QDialog#solicitudesPrestamo QDateEdit {
+                background-color: white;
+                color: #1e293b;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 8px 10px;
+                selection-background-color: #bfdbfe;
+                selection-color: #1e293b;
+            }
+
+            QDialog#solicitudesPrestamo QDateEdit:hover {
+                border-color: #94a3b8;
+            }
+
+            QDialog#solicitudesPrestamo QDateEdit:focus {
+                border: 1px solid #3b82f6;
+            }
+
+            QTableWidget#tablaSolicitudes {
+                background-color: white;
+                alternate-background-color: #f8fafc;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                color: #1e293b;
+                gridline-color: #e2e8f0;
+                font-size: 13px;
+            }
+
+            QDialog#solicitudesPrestamo QHeaderView::section {
+                background-color: #3b82f6;
+                color: white;
+                padding: 9px;
+                border: none;
+                font-weight: bold;
+            }
+
+            QDialog#solicitudesPrestamo QPushButton {
+                min-width: 120px;
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+
+            QDialog#solicitudesPrestamo QPushButton#btnAprobarSolicitud {
+                background-color: #2563eb;
+                color: white;
+                border: 1px solid #2563eb;
+            }
+
+            QDialog#solicitudesPrestamo QPushButton#btnAprobarSolicitud:hover {
+                background-color: #1d4ed8;
+                border-color: #1d4ed8;
+            }
+
+            QDialog#solicitudesPrestamo QPushButton#btnRechazarSolicitud {
+                background-color: #fff1f2;
+                color: #be123c;
+                border: 1px solid #fecdd3;
+            }
+
+            QDialog#solicitudesPrestamo QPushButton#btnRechazarSolicitud:hover {
+                background-color: #ffe4e6;
+                border-color: #fda4af;
+            }
+
+            QDialog#solicitudesPrestamo QPushButton#btnCerrarSolicitudes {
+                background-color: white;
+                color: #334155;
+                border: 1px solid #cbd5e1;
+            }
+
+            QDialog#solicitudesPrestamo QPushButton#btnCerrarSolicitudes:hover {
+                background-color: #f1f5f9;
+                border-color: #94a3b8;
+            }
+        """)
         layout = QVBoxLayout(dialogo)
         tabla = QTableWidget(len(solicitudes), 9)
+        tabla.setObjectName("tablaSolicitudes")
+        tabla.setAlternatingRowColors(True)
         tabla.setHorizontalHeaderLabels(
             [
                 "ID", "Cliente", "Cédula", "Ingreso mensual", "Monto solicitado",
@@ -1451,10 +1783,25 @@ class AdminWindow(QMainWindow):
                 tabla.setItem(fila, columna, QTableWidgetItem(valor))
         layout.addWidget(tabla)
 
+        fecha_primer_pago_input = QDateEdit()
+        fecha_primer_pago_input.setCalendarPopup(True)
+        fecha_primer_pago_input.setMinimumDate(QDate.currentDate())
+        fecha_primer_pago_input.setDate(QDate.currentDate().addMonths(1))
+        fecha_primer_pago_input.setDisplayFormat("dd/MM/yyyy")
+        fecha_label = QLabel(
+            "Fecha de la primera cuota para préstamos aprobados:"
+        )
+        fecha_label.setObjectName("fechaPrimeraCuota")
+        layout.addWidget(fecha_label)
+        layout.addWidget(fecha_primer_pago_input)
+
         botones = QHBoxLayout()
         btn_aprobar = QPushButton("Aprobar y crear préstamo")
+        btn_aprobar.setObjectName("btnAprobarSolicitud")
         btn_rechazar = QPushButton("Rechazar")
+        btn_rechazar.setObjectName("btnRechazarSolicitud")
         btn_cerrar = QPushButton("Cerrar")
+        btn_cerrar.setObjectName("btnCerrarSolicitudes")
         botones.addWidget(btn_aprobar)
         botones.addWidget(btn_rechazar)
         botones.addWidget(btn_cerrar)
@@ -1473,7 +1820,11 @@ class AdminWindow(QMainWindow):
             cliente_id = int(solicitudes[fila]["cliente_id"])
             try:
                 prestamo_id = resolver_solicitud_prestamo(
-                    solicitud_id, aprobada
+                    solicitud_id,
+                    aprobada,
+                    date.fromisoformat(
+                        fecha_primer_pago_input.date().toString("yyyy-MM-dd")
+                    ) if aprobada else None,
                 )
             except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
                 QMessageBox.critical(

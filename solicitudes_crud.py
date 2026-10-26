@@ -1,7 +1,9 @@
 import math
+from datetime import date
 from typing import Any
 
 from conexion import obtener_conexion
+from prestamos_crud import asegurar_esquema_prestamos
 
 
 def _crear_tabla_solicitudes(cursor) -> None:
@@ -100,12 +102,17 @@ def listar_solicitudes_pendientes() -> list[dict[str, Any]]:
         conexion.close()
 
 
-def resolver_solicitud_prestamo(solicitud_id: int, aprobada: bool) -> int | None:
+def resolver_solicitud_prestamo(
+    solicitud_id: int,
+    aprobada: bool,
+    fecha_primer_pago: date | None = None,
+) -> int | None:
     conexion = obtener_conexion()
     cursor = None
     try:
         cursor = conexion.cursor(dictionary=True)
         _crear_tabla_solicitudes(cursor)
+        asegurar_esquema_prestamos(cursor)
         cursor.execute(
             """
             SELECT cliente_id, monto, plazo
@@ -124,13 +131,15 @@ def resolver_solicitud_prestamo(solicitud_id: int, aprobada: bool) -> int | None
         if aprobada:
             cursor.execute(
                 """
-                INSERT INTO prestamo (cliente_id, monto, plazo, estado)
-                VALUES (%s, %s, %s, 'Activo')
+                INSERT INTO prestamo
+                    (cliente_id, monto, plazo, estado, fecha_primer_pago)
+                VALUES (%s, %s, %s, 'Activo', %s)
                 """,
                 (
                     solicitud["cliente_id"],
                     solicitud["monto"],
                     solicitud["plazo"],
+                    fecha_primer_pago or date.today(),
                 ),
             )
             prestamo_id = cursor.lastrowid

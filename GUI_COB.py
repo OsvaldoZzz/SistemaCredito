@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QHeaderView
 from mysql.connector import Error as MySQLConnectorError
 from clientes_crud import crear_cliente, listar_clientes
 from prestamos_crud import listar_prestamos, listar_todos_los_prestamos
+from pagos_ui import abrir_dialogo_abono
 from reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 from validaciones import validar_cliente_unico, validar_datos_cliente
 from calculos_prestamo import (
@@ -385,7 +386,7 @@ class CobWindow(QMainWindow):
             "Monto inicial",
             f"Interés ({PORCENTAJE_INTERES:.0f}%)",
             "Total a pagar",
-            "Plazo",
+            "Cuotas pendientes",
             "Estado"
         ])
 
@@ -523,7 +524,7 @@ class CobWindow(QMainWindow):
                 f"C$ {float(prestamo['monto']):,.2f}",
                 f"C$ {calcular_interes(prestamo['monto']):,.2f}",
                 f"C$ {calcular_total_prestamo(prestamo['monto']):,.2f}",
-                f"{prestamo['plazo']} cuotas",
+                f"{prestamo['cuotas_pendientes']} cuotas",
                 prestamo["estado"],
             )
             for columna, valor in enumerate(valores):
@@ -586,25 +587,21 @@ class CobWindow(QMainWindow):
             )
             return
 
-        monto, aceptado = QInputDialog.getDouble(
-            self,
-            "Abonar prestamo",
-            "Monto del abono:",
-            0.0,
-            0.01,
-            100000000.0,
-            2
-        )
-        if not aceptado:
+        id_item = self.tablaPrestamos.item(fila, 0)
+        if id_item is None:
             return
 
-        id_item = self.tablaPrestamos.item(fila, 0)
-        QMessageBox.information(
-            self,
-            "Abono registrado",
-            f"Se registro un abono de C$ {monto:,.2f} "
-            f"para el prestamo {id_item.text()} de {cliente['nombre']}."
-        )
+        try:
+            registrado = abrir_dialogo_abono(self, int(id_item.text()))
+        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            QMessageBox.critical(
+                self,
+                "Error al registrar abono",
+                f"No se pudo registrar el abono: {error}",
+            )
+            return
+        if registrado:
+            self.cargarPrestamosCliente(cliente)
 
     def generarReportesGlobales(self):
         prestamos_por_cliente = {
