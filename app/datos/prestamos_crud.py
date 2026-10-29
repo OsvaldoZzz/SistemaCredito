@@ -1,14 +1,20 @@
 import calendar
-import math
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
-from calculos_prestamo import calcular_estado_cuota, generar_cuotas
-from conexion import obtener_conexion
+from app.logica.calculos_prestamo import calcular_estado_cuota, generar_cuotas
+from app.config.conexion import obtener_conexion
+from app.logica.validaciones import validar_condiciones_prestamo, validar_fecha, validar_id, validar_monto
 
 
 def asegurar_esquema_prestamos(cursor) -> None:
+    cursor.execute("SHOW COLUMNS FROM prestamo LIKE 'frecuencia_pago'")
+    if not cursor.fetchall():
+        cursor.execute(
+            "ALTER TABLE prestamo "
+            "ADD COLUMN frecuencia_pago VARCHAR(10) NOT NULL DEFAULT 'Mensual'"
+        )
     cursor.execute(
         "SHOW COLUMNS FROM prestamo LIKE 'fecha_primer_pago'"
     )
@@ -52,7 +58,7 @@ def _fecha_mes_siguiente(fecha: date) -> date:
 def _cargar_cuotas_prestamo(cursor, prestamo_id: int) -> list[dict[str, Any]]:
     cursor.execute(
         """
-        SELECT monto, plazo, fecha_primer_pago
+        SELECT monto, plazo, fecha_primer_pago, frecuencia_pago
         FROM prestamo
         WHERE id = %s
         """,
@@ -81,6 +87,7 @@ def _cargar_cuotas_prestamo(cursor, prestamo_id: int) -> list[dict[str, Any]]:
         prestamo["monto"],
         prestamo["plazo"],
         prestamo["fecha_primer_pago"],
+        prestamo["frecuencia_pago"],
     )
     resultado = []
     for cuota in cuotas:
@@ -111,14 +118,24 @@ def _agregar_cuotas_pendientes(
 ) -> list[dict[str, Any]]:
     for prestamo in prestamos:
         cuotas = _cargar_cuotas_prestamo(cursor, prestamo["id"])
-        prestamo["cuotas_pendientes"] = sum(
-            cuota["total_pendiente"] > 0
-            for cuota in cuotas
+        pendientes = [cuota for cuota in cuotas if cuota["total_pendiente"] > 0]
+        prestamo["cuotas_pendientes"] = len(pendientes)
+        prestamo["saldo_pendiente"] = sum(
+            (cuota["total_pendiente"] for cuota in pendientes), Decimal("0.00")
+        )
+        prestamo["proximo_vencimiento"] = min(
+            (cuota["fecha_vencimiento"] for cuota in pendientes), default=None
+        )
+        prestamo["estado_actual"] = (
+            "Pagado" if not pendientes
+            else "Vencido" if any(cuota["dias_mora"] > 0 for cuota in pendientes)
+            else "Activo"
         )
     return prestamos
 
 
 def listar_cuotas_prestamo(prestamo_id: int) -> list[dict[str, Any]]:
+    validar_id(prestamo_id)
     conexion = obtener_conexion()
     cursor = None
     try:
@@ -141,15 +158,13 @@ def registrar_abono_cuota(
     numero_cuota: int,
     monto: Decimal | int | float | str,
 ) -> dict[str, Any]:
-    monto_pago = Decimal(str(monto))
-    if not monto_pago.is_finite() or monto_pago <= 0:
-        raise ValueError("El monto del abono debe ser mayor que cero.")
+    validar_id(prestamo_id)
+    validar_id(numero_cuota)
+    monto_pago = validar_monto(monto)
     monto_pago = monto_pago.quantize(
         Decimal("0.01"),
         rounding=ROUND_HALF_UP,
     )
-    if monto_pago <= 0:
-        raise ValueError("El abono debe ser de al menos C$ 0.01.")
 
     conexion = obtener_conexion()
     cursor = None
@@ -225,8 +240,8 @@ def actualizar_prestamo(
     plazo: int,
     estado: str,
 ) -> bool:
-    if not math.isfinite(monto) or monto <= 0 or plazo <= 0:
-        raise ValueError("El monto y el plazo deben ser mayores que cero.")
+    validar_id(prestamo_id)
+    monto = validar_condiciones_prestamo(monto, plazo)
     if estado not in {"Activo", "Pagado", "Vencido"}:
         raise ValueError("El estado del préstamo no es válido.")
 
@@ -284,6 +299,7 @@ def actualizar_prestamo(
 
 
 def eliminar_prestamo(prestamo_id: int) -> bool:
+    validar_id(prestamo_id)
     conexion = obtener_conexion()
     cursor = None
     try:
@@ -301,6 +317,7 @@ def eliminar_prestamo(prestamo_id: int) -> bool:
 
 
 def listar_prestamos(cliente_id: int) -> list[dict[str, Any]]:
+    validar_id(cliente_id)
     conexion = obtener_conexion()
     cursor = None
     try:
@@ -308,7 +325,7 @@ def listar_prestamos(cliente_id: int) -> list[dict[str, Any]]:
         asegurar_esquema_prestamos(cursor)
         cursor.execute(
             """
-            SELECT id, monto, plazo, estado, fecha_primer_pago
+            SELECT id, monto, plazo, estado, fecha_primer_pago, frecuencia_pago
             FROM prestamo
             WHERE cliente_id = %s
             ORDER BY id
@@ -332,7 +349,7 @@ def listar_todos_los_prestamos() -> list[dict[str, Any]]:
         asegurar_esquema_prestamos(cursor)
         cursor.execute(
             """
-            SELECT id, cliente_id, monto, plazo, estado, fecha_primer_pago
+            SELECT id, cliente_id, monto, plazo, estado, fecha_primer_pago, frecuencia_pago
             FROM prestamo
             ORDER BY cliente_id, id
             """
@@ -353,10 +370,14 @@ def crear_prestamo(
     estado: str = "Activo",
     fecha_primer_pago: date | None = None,
 ) -> int:
-    if not math.isfinite(monto) or monto <= 0 or plazo <= 0:
-        raise ValueError("El monto y el plazo deben ser mayores que cero.")
+    validar_id(cliente_id)
+    monto = validar_condiciones_prestamo(monto, plazo)
+    if fecha_primer_pago is not None:
+        validar_fecha(fecha_primer_pago)
     if estado not in {"Activo", "Pagado", "Vencido"}:
         raise ValueError("El estado del préstamo no es válido.")
+    if estado == "Pagado":
+        raise ValueError("Un préstamo nuevo no puede estar pagado sin registrar sus abonos.")
 
     conexion = obtener_conexion()
     cursor = None

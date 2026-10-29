@@ -1,9 +1,10 @@
-import math
 from datetime import date
 from typing import Any
 
-from conexion import obtener_conexion
-from prestamos_crud import asegurar_esquema_prestamos
+from app.config.conexion import obtener_conexion
+from app.logica.calculos_prestamo import FRECUENCIAS_PAGO
+from app.datos.prestamos_crud import asegurar_esquema_prestamos
+from app.logica.validaciones import validar_condiciones_prestamo, validar_fecha, validar_id, validar_monto
 
 
 def _crear_tabla_solicitudes(cursor) -> None:
@@ -14,6 +15,7 @@ def _crear_tabla_solicitudes(cursor) -> None:
             cliente_id INT NOT NULL,
             monto DECIMAL(12, 2) NOT NULL,
             plazo INT NOT NULL,
+            frecuencia_pago VARCHAR(10) NOT NULL DEFAULT 'Mensual',
             ingreso_mensual DECIMAL(12, 2) NULL,
             estado VARCHAR(20) NOT NULL DEFAULT 'Pendiente',
             fecha_solicitud TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -25,6 +27,12 @@ def _crear_tabla_solicitudes(cursor) -> None:
         """
     )
     # Conserva las solicitudes anteriores cuando la tabla ya existe.
+    cursor.execute("SHOW COLUMNS FROM solicitudes_prestamo LIKE 'frecuencia_pago'")
+    if not cursor.fetchall():
+        cursor.execute(
+            "ALTER TABLE solicitudes_prestamo "
+            "ADD COLUMN frecuencia_pago VARCHAR(10) NOT NULL DEFAULT 'Mensual'"
+        )
     cursor.execute("SHOW COLUMNS FROM solicitudes_prestamo LIKE 'ingreso_mensual'")
     if not cursor.fetchall():
         cursor.execute(
@@ -38,20 +46,15 @@ def crear_solicitud_prestamo(
     monto: float,
     plazo: int,
     ingreso_mensual: float | None = None,
+    frecuencia_pago: str = "Mensual",
 ) -> int:
-    if (
-        cliente_id <= 0
-        or not math.isfinite(monto)
-        or monto <= 0
-        or plazo <= 0
-    ):
-        raise ValueError("El cliente, monto y plazo deben ser válidos.")
-    if ingreso_mensual is not None and (
-        not math.isfinite(ingreso_mensual)
-        or ingreso_mensual <= 0
-        or ingreso_mensual > 9_999_999_999.99
-    ):
-        raise ValueError("El ingreso mensual debe ser mayor que cero y válido.")
+    if frecuencia_pago not in FRECUENCIAS_PAGO:
+        raise ValueError("La frecuencia debe ser semanal, quincenal o mensual.")
+    validar_id(cliente_id)
+    monto = validar_condiciones_prestamo(monto, plazo)
+    if ingreso_mensual is None:
+        raise ValueError("Ingresa el ingreso mensual del cliente.")
+    ingreso_mensual = validar_monto(ingreso_mensual)
 
     conexion = obtener_conexion()
     cursor = None
@@ -61,10 +64,10 @@ def crear_solicitud_prestamo(
         cursor.execute(
             """
             INSERT INTO solicitudes_prestamo
-                (cliente_id, monto, plazo, ingreso_mensual)
-            VALUES (%s, %s, %s, %s)
+                (cliente_id, monto, plazo, ingreso_mensual, frecuencia_pago)
+            VALUES (%s, %s, %s, %s, %s)
             """,
-            (cliente_id, monto, plazo, ingreso_mensual),
+            (cliente_id, monto, plazo, ingreso_mensual, frecuencia_pago),
         )
         conexion.commit()
         return cursor.lastrowid
@@ -87,7 +90,7 @@ def listar_solicitudes_pendientes() -> list[dict[str, Any]]:
         cursor = conexion.cursor(dictionary=True)
         cursor.execute(
             """
-            SELECT s.id, s.cliente_id, s.monto, s.plazo, s.estado,
+            SELECT s.id, s.cliente_id, s.monto, s.plazo, s.estado, s.frecuencia_pago,
                    s.fecha_solicitud, s.ingreso_mensual, c.nombre, c.cedula
             FROM solicitudes_prestamo AS s
             JOIN clientes AS c ON c.id = s.cliente_id
@@ -107,6 +110,11 @@ def resolver_solicitud_prestamo(
     aprobada: bool,
     fecha_primer_pago: date | None = None,
 ) -> int | None:
+    validar_id(solicitud_id)
+    if type(aprobada) is not bool:
+        raise ValueError("La decisión de la solicitud no es válida.")
+    if aprobada and fecha_primer_pago is not None:
+        validar_fecha(fecha_primer_pago)
     conexion = obtener_conexion()
     cursor = None
     try:
@@ -115,7 +123,7 @@ def resolver_solicitud_prestamo(
         asegurar_esquema_prestamos(cursor)
         cursor.execute(
             """
-            SELECT cliente_id, monto, plazo
+            SELECT cliente_id, monto, plazo, frecuencia_pago
             FROM solicitudes_prestamo
             WHERE id = %s AND estado = 'Pendiente'
             FOR UPDATE
@@ -129,17 +137,22 @@ def resolver_solicitud_prestamo(
         estado = "Aprobada" if aprobada else "Rechazada"
         prestamo_id = None
         if aprobada:
+            validar_id(solicitud["cliente_id"])
+            validar_condiciones_prestamo(solicitud["monto"], solicitud["plazo"])
+            if solicitud["frecuencia_pago"] not in FRECUENCIAS_PAGO:
+                raise ValueError("La frecuencia de la solicitud no es válida.")
             cursor.execute(
                 """
                 INSERT INTO prestamo
-                    (cliente_id, monto, plazo, estado, fecha_primer_pago)
-                VALUES (%s, %s, %s, 'Activo', %s)
+                    (cliente_id, monto, plazo, estado, fecha_primer_pago, frecuencia_pago)
+                VALUES (%s, %s, %s, 'Activo', %s, %s)
                 """,
                 (
                     solicitud["cliente_id"],
                     solicitud["monto"],
                     solicitud["plazo"],
                     fecha_primer_pago or date.today(),
+                    solicitud["frecuencia_pago"],
                 ),
             )
             prestamo_id = cursor.lastrowid

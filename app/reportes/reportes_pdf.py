@@ -5,7 +5,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 import os
 from decimal import Decimal
-from calculos_prestamo import calcular_interes, calcular_total_prestamo
+from app.logica.calculos_prestamo import calcular_interes, calcular_total_prestamo
+from app.config.rutas import ruta_reporte
 
 
 def _monto_decimal(valor):
@@ -15,6 +16,7 @@ def _monto_decimal(valor):
 
 
 def generar_estado_cartera(clientes, prestamos_por_cliente, filename="estado_cartera.pdf"):
+    filename = ruta_reporte(filename)
     doc = SimpleDocTemplate(filename, pagesize=landscape(letter))
     elements = []
     styles = getSampleStyleSheet()
@@ -72,6 +74,7 @@ def generar_estado_cartera(clientes, prestamos_por_cliente, filename="estado_car
     os.startfile(filename)
 
 def generar_reporte_cobranza(clientes, prestamos_por_cliente, filename="reporte_cobranza.pdf"):
+    filename = ruta_reporte(filename)
     doc = SimpleDocTemplate(filename, pagesize=landscape(letter))
     elements = []
     styles = getSampleStyleSheet()
@@ -114,6 +117,7 @@ def generar_reporte_cobranza(clientes, prestamos_por_cliente, filename="reporte_
     os.startfile(filename)
 
 def generar_recibo_pago(cliente, prestamo_id, monto_abono, filename="recibo_pago.pdf"):
+    filename = ruta_reporte(filename)
     c = canvas.Canvas(filename, pagesize=letter)
     width, height = letter
 

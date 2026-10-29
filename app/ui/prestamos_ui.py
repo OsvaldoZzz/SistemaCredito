@@ -14,8 +14,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt
 
-from calculos_prestamo import PORCENTAJE_INTERES
-from prestamos_crud import listar_cuotas_prestamo
+from app.logica.calculos_prestamo import PORCENTAJE_INTERES
+from app.datos.prestamos_crud import listar_cuotas_prestamo
 
 
 def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
@@ -100,7 +100,7 @@ def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
                     else "#fef3c7"
                 ))
                 item.setForeground(QColor(
-                    "#166534" if estado == "Pagada"
+                    "#31552B" if estado == "Pagada"
                     else "#991b1b" if estado == "En mora"
                     else "#92400e"
                 ))

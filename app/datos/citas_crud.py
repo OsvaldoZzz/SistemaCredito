@@ -1,18 +1,23 @@
 from datetime import date
 
-from conexion import obtener_conexion
+from app.config.conexion import obtener_conexion
+from app.logica.validaciones import validar_fecha, validar_id
 
 
 def crear_cita(cliente_id: int, fecha: date) -> int:
-    if cliente_id <= 0:
-        raise ValueError("El cliente seleccionado no es válido.")
-    if fecha < date.today():
-        raise ValueError("No se puede agendar una cita en una fecha pasada.")
+    validar_id(cliente_id)
+    validar_fecha(fecha)
 
     conexion = obtener_conexion()
     cursor = None
     try:
         cursor = conexion.cursor()
+        cursor.execute(
+            "SELECT id FROM citas WHERE cliente_id = %s AND fecha = %s LIMIT 1",
+            (cliente_id, fecha),
+        )
+        if cursor.fetchone() is not None:
+            raise ValueError("Ya tienes una cita registrada para esa fecha.")
         cursor.execute(
             """
             INSERT INTO citas (cliente_id, fecha)
@@ -32,6 +37,7 @@ def crear_cita(cliente_id: int, fecha: date) -> int:
 
 
 def listar_citas(cliente_id: int) -> list[dict]:
+    validar_id(cliente_id)
     conexion = obtener_conexion()
     cursor = None
     try:

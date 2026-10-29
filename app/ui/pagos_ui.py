@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 
-from prestamos_crud import listar_cuotas_prestamo, registrar_abono_cuota
+from app.datos.prestamos_crud import listar_cuotas_prestamo, registrar_abono_cuota
 
 
 def abrir_dialogo_abono(parent, prestamo_id: int) -> bool:

@@ -1,20 +1,20 @@
+from app.config.rutas import IMAGENES_DIR
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
-from pathlib import Path
 from mysql.connector import Error as MySQLConnectorError
-from clientes_crud import crear_cliente, listar_clientes
-from citas_crud import (
+from app.datos.clientes_crud import actualizar_cliente, crear_cliente, eliminar_cliente, listar_clientes
+from app.datos.citas_crud import (
     listar_todas_las_citas,
 )
-from prestamos_crud import listar_prestamos, listar_todos_los_prestamos
-from pagos_ui import abrir_dialogo_abono
-from prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
-from reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
-from solicitudes_crud import crear_solicitud_prestamo
-from validaciones import validar_cliente_unico, validar_datos_cliente
-from calculos_prestamo import (
+from app.datos.prestamos_crud import listar_prestamos, listar_todos_los_prestamos
+from app.ui.pagos_ui import abrir_dialogo_abono
+from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
+from app.reportes.reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
+from app.datos.solicitudes_crud import crear_solicitud_prestamo
+from app.logica.validaciones import validar_cliente_unico, validar_datos_cliente
+from app.logica.calculos_prestamo import (
     PORCENTAJE_INTERES,
     calcular_interes,
     calcular_total_prestamo,
@@ -36,29 +36,30 @@ class RecepWindow(QMainWindow):
     def setRecep(self):
         self.showMaximized()
         self.setWindowTitle("Panel Recepcionista")
-        self.setWindowIcon(QIcon("img/logoBG.png"))
+        self.setWindowIcon(QIcon(str(IMAGENES_DIR / "logoBG.png")))
 
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #f5f6fa;
+                background-color: #F6F5F1;
             }
 
             /* ENCABEZADO */
 
             QWidget#encabezado {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
+                border-bottom: 3px solid #C09848;
             }
 
             QLabel#tituloPanel {
-                color: #1e293b;
+                color: #102848;
                 font-size: 22px;
                 font-weight: bold;
             }
 
             QLabel#infoUsuario {
-                color: #64748b;
+                color: #65758B;
                 font-size: 16px;
                 font-weight: bold;
             }
@@ -66,50 +67,62 @@ class RecepWindow(QMainWindow):
             /* TITULOS */
 
             QLabel {
-                color: #1e293b;
+                color: #102848;
                 font-size: 18px;
                 font-weight: bold;
             }
 
             QLabel#lblCliente {
-                color: #1e293b;
+                color: #102848;
                 font-size: 20px;
                 font-weight: bold;
             }
 
             QLabel#lblCorreo {
-                color: #64748b;
+                color: #65758B;
                 font-size: 14px;
                 font-weight: normal;
             }
 
             QLabel#lblDir {
                 margin-bottom: 5px;
-                color: #64748b;
+                color: #65758B;
                 font-size: 14px;
                 font-weight: normal;
             }
 
             QLineEdit#lineaEdit {
-                background-color: #f5f5f5;
-                border: 1px solid #d1d5db;
+                background-color: #F4F2EC;
+                border: 1px solid #DDD8CB;
                 border-radius: 8px;
                 padding: 5px;
-                color: #000;
+                color: #102848;
             }
 
             QPushButton#btnBuscar {
+                background-color: #F4F2EC;
+                border: 1px solid #DDD8CB;
                 padding: 5px;
+            }
+
+            QPushButton#btnBuscar:hover:enabled:!pressed {
+                background-color: #E8E3D7;
+                border-color: #C09848;
+            }
+
+            QPushButton#btnBuscar:pressed:enabled {
+                background-color: #D9D2C2;
+                border-color: #A69D89;
             }
 
             /* LISTA DE CLIENTES */
 
             QListWidget {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
                 padding: 8px;
-                color: #1e293b;
+                color: #102848;
                 font-size: 15px;
             }
 
@@ -120,11 +133,11 @@ class RecepWindow(QMainWindow):
             }
 
             QListWidget::item:hover {
-                background-color: #e8f0fe;
+                background-color: #F4EBD5;
             }
 
             QListWidget::item:selected {
-                background-color: #3b82f6;
+                background-color: #102848;
                 color: white;
             }
 
@@ -132,13 +145,13 @@ class RecepWindow(QMainWindow):
 
             QWidget#panelPrestamos {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
             }
 
             QWidget#panelClientes {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
             }
 
@@ -150,25 +163,26 @@ class RecepWindow(QMainWindow):
 
             QTableWidget {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
-                color: #1e293b;
+                color: #102848;
                 font-size: 15px;
-                gridline-color: #e5e7eb;
+                gridline-color: #E8E3D7;
             }
 
             QHeaderView::section {
-                background-color: #3B82F6;
+                background-color: #102848;
                 color: white;
                 padding: 10px;
                 border: none;
+                border-bottom: 2px solid #C09848;
                 font-weight: bold;
             }
 
             QPushButton#acciones {
-                background-color: #f8fafc;
-                color: #1e293b;
-                border: 1px solid #cbd5e1;
+                background-color: #FBFAF6;
+                color: #102848;
+                border: 1px solid #D9D2C2;
                 border-radius: 6px;
                 padding: 2px;
                 min-width: 0px;
@@ -176,45 +190,74 @@ class RecepWindow(QMainWindow):
             }
 
             QPushButton#acciones:hover {
-                background-color: #dbeafe;
-                border-color: #60a5fa;
+                background-color: #F4EBD5;
+                border-color: #C09848;
             }
 
             QDialog#detallePrestamo {
-                background-color: #f8fafc;
+                background-color: #FBFAF6;
             }
 
             QLabel#notaPrestamo {
-                background-color: #eff6ff;
-                border: 1px solid #bfdbfe;
+                background-color: #FAF7EF;
+                border: 1px solid #E6D3A5;
                 border-radius: 8px;
                 padding: 10px;
-                color: #1e3a8a;
+                color: #102848;
                 font-size: 13px;
             }
 
             QLabel#resumenPrestamo {
                 background-color: white;
-                border: 1px solid #cbd5e1;
+                border: 1px solid #D9D2C2;
                 border-radius: 8px;
                 padding: 10px;
-                color: #1e293b;
+                color: #102848;
                 font-size: 14px;
             }
 
             QTableWidget#tablaDetallePrestamo {
                 background-color: white;
-                alternate-background-color: #f8fafc;
-                border: 1px solid #cbd5e1;
+                alternate-background-color: #FBFAF6;
+                border: 1px solid #D9D2C2;
                 border-radius: 8px;
-                gridline-color: #e2e8f0;
+                gridline-color: #E8E3D7;
                 font-size: 13px;
+            }
+
+            QDialog#accionesClientes { background-color: #FBFAF6; }
+            QPushButton:disabled { background-color: #D9D2C2; color: #65758B; }
+            QPushButton#cancelar_accion {
+                background-color: white; color: #33465F;
+                border: 1px solid #D9D2C2;
             }
 
             /* BOTONES */
 
+            QPushButton#btnAcciones {
+                background-color: #102848;
+                color: white;
+                border-radius: 8px;
+                padding: 10px 16px;
+                font-weight: bold;
+            }
+
+            QPushButton#btnAcciones {
+                background-color: #183A60;
+                border-color: #0B1C32;
+            }
+
+            QPushButton#btnAcciones:pressed {
+                background-color: #0B1C32;
+                border-color: #0B1C32;
+            }
+
+            QPushButton#btnAcciones:focus {
+                border: 1px solid #E6D3A5;
+            }
+
             QPushButton {
-                background-color: #3B82F6;
+                background-color: #102848;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -223,51 +266,118 @@ class RecepWindow(QMainWindow):
                 font-weight: bold;
             }
 
-            QPushButton:hover {
-                background-color: #2563eb;
+            QPushButton:hover:enabled:!pressed {
+                background-color: #285580;
             }
 
-            QPushButton:hover#crear_cliente {
-                background-color: green;
+            QPushButton#btnAcciones:hover:enabled:!pressed {
+                background-color: #285580;
             }
 
-            QPushButton:hover#cerrarSesion {
-                background-color: red;
+            QPushButton:pressed {
+                background-color: #0B1C32;
             }
 
-            QPushButton:hover#solicitar_prestamo {
-                background-color: green;
+            QPushButton#crear_cliente:enabled,
+            QPushButton#solicitar_prestamo:enabled {
+                background-color: #78B85B;
+                color: #102848;
             }
 
-            QPushButton:hover#abonar_prestamo {
-                background-color: gold;
+            QPushButton#crear_cliente:hover:enabled:!pressed,
+            QPushButton#solicitar_prestamo:hover:enabled:!pressed {
+                background-color: #69A64D;
+                color: #102848;
             }
 
-            QPushButton:hover#reportCart {
-                background-color: gold;
+            QPushButton#crear_cliente:pressed:enabled,
+            QPushButton#solicitar_prestamo:pressed:enabled {
+                background-color: #58963F;
+                color: #102848;
             }
 
-            QPushButton:hover#reportCob {
-                background-color: gold;
+            QPushButton#actualizar_clientes:enabled,
+            QPushButton#abonar_prestamo:enabled {
+                background-color: #E8BD45;
+                color: #102848;
             }
 
-            QPushButton:hover#verCitas {
-                background-color: #8B4513;
+            QPushButton#actualizar_clientes:hover:enabled:!pressed,
+            QPushButton#abonar_prestamo:hover:enabled:!pressed {
+                background-color: #D8AC34;
+                color: #102848;
+            }
+
+            QPushButton#actualizar_clientes:pressed:enabled,
+            QPushButton#abonar_prestamo:pressed:enabled {
+                background-color: #C99A28;
+                color: #102848;
+            }
+
+            QPushButton#eliminar_cliente:enabled,
+            QPushButton#cerrarSesion:enabled {
+                background-color: #EF6262;
+                color: #102848;
+            }
+
+            QPushButton#eliminar_cliente:hover:enabled:!pressed,
+            QPushButton#cerrarSesion:hover:enabled:!pressed {
+                background-color: #DC4E4E;
+                color: #102848;
+            }
+
+            QPushButton#eliminar_cliente:pressed:enabled,
+            QPushButton#cerrarSesion:pressed:enabled {
+                background-color: #C83C3C;
+                color: #102848;
+            }
+
+            QPushButton#verCitas:enabled {
+                background-color: #CBD0D6;
+                color: #102848;
+            }
+
+            QPushButton#verCitas:hover:enabled:!pressed {
+                background-color: #B7BEC6;
+                color: #102848;
+            }
+
+            QPushButton#verCitas:pressed:enabled {
+                background-color: #A3ADB8;
+                color: #102848;
+            }
+
+            QPushButton#reportCart:enabled,
+            QPushButton#reporteCob:enabled {
+                background-color: #3973A5;
+                color: white;
+            }
+
+            QPushButton#reportCart:hover:enabled:!pressed,
+            QPushButton#reporteCob:hover:enabled:!pressed {
+                background-color: #306491;
+                color: white;
+            }
+
+            QPushButton#reportCart:pressed:enabled,
+            QPushButton#reporteCob:pressed:enabled {
+                background-color: #27557D;
+                color: white;
             }
 
             QMessageBox {
-                background-color: #f5f5f5;
-                color: #000;
+                background-color: #F4F2EC;
+                color: #102848;
             }
 
             QMessageBox QLabel {
-                color: #000;
+                color: #102848;
                 font-size: 14px;
                 font-weight: normal;
             }
 
             QMessageBox QPushButton {
-                background-color: #3B82F6;
+                background-color: #102848;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -278,7 +388,7 @@ class RecepWindow(QMainWindow):
             }
 
             QMessageBox QPushButton:hover {
-                background-color: green;
+                background-color: #3F6B36;
             }
         """)
 
@@ -336,7 +446,7 @@ class RecepWindow(QMainWindow):
 
         self.btnBuscar = QPushButton()
         self.btnBuscar.setObjectName("btnBuscar")
-        self.btnBuscar.setIcon(QIcon("img/lupa.png"))
+        self.btnBuscar.setIcon(QIcon(str(IMAGENES_DIR / "lupa.png")))
         self.btnBuscar.setIconSize(QSize(24, 24))
         self.btnBuscar.clicked.connect(self.buscarCliente)
 
@@ -358,20 +468,16 @@ class RecepWindow(QMainWindow):
 
         botonesLayout = QHBoxLayout()
 
-        self.btnCreate = QPushButton("Crear Cliente")
-        self.btnCreate.setObjectName("crear_cliente")
-
-        self.btnActualizar = QPushButton("Actualizar datos")
-        self.btnActualizar.clicked.connect(self.actualizarDatos)
+        self.btnAcciones = QPushButton("Acciones")
+        self.btnAcciones.setObjectName("btnAcciones")
+        self.btnAcciones.clicked.connect(self.accionesClientes)
 
         self.btnCerrar = QPushButton("Cerrar Sesion")
         self.btnCerrar.setObjectName("cerrarSesion")
 
-        self.btnCreate.clicked.connect(self.crearCl)
         self.btnCerrar.clicked.connect(self.btnCerrSes)
 
-        botonesLayout.addWidget(self.btnCreate)
-        botonesLayout.addWidget(self.btnActualizar)
+        botonesLayout.addWidget(self.btnAcciones)
         botonesLayout.addWidget(self.btnCerrar)
 
         clientesLayout.addLayout(botonesLayout)
@@ -636,7 +742,7 @@ class RecepWindow(QMainWindow):
         boton_ver.setObjectName("acciones")
         boton_ver.setFixedSize(34, 34)
         boton_ver.setIcon(
-            QIcon(str(Path(__file__).resolve().parent / "img" / "ver.png"))
+            QIcon(str(IMAGENES_DIR / "ver.png"))
         )
         boton_ver.setIconSize(QSize(25, 25))
         boton_ver.setToolTip("Ver cuotas, pagos y mora")
@@ -670,6 +776,213 @@ class RecepWindow(QMainWindow):
     # BOTÓN CREAR CLIENTE
     # ==========================================================
 
+    def accionesClientes(self):
+        dialogo = QDialog(self)
+        dialogo.setObjectName("accionesClientes")
+        dialogo.setWindowTitle("Acciones de clientes")
+        dialogo.setMinimumWidth(360)
+        layout = QVBoxLayout(dialogo)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        seleccionado = self.clienteSeleccionado() is not None
+        accion = []
+
+        def elegir(funcion):
+            accion.append(funcion)
+            dialogo.accept()
+
+        for texto, identificador, funcion, habilitado in (
+            ("Crear clientes", "crear_cliente", self.crearCl, True),
+            ("Editar clientes", "actualizar_clientes", self.actualizarCliente, seleccionado),
+            ("Eliminar clientes", "eliminar_cliente", self.eliminarCliente, seleccionado),
+        ):
+            boton = QPushButton(texto)
+            boton.setObjectName(identificador)
+            boton.setEnabled(habilitado)
+            boton.clicked.connect(lambda checked=False, f=funcion: elegir(f))
+            layout.addWidget(boton)
+        cancelar = QPushButton("Cancelar")
+        cancelar.setObjectName("cancelar_accion")
+        cancelar.clicked.connect(dialogo.reject)
+        layout.addWidget(cancelar)
+        if dialogo.exec() == QDialog.Accepted and accion:
+            accion[0]()
+
+    def formularioActualizacion(self, titulo):
+        dialogo = QDialog(self)
+        dialogo.setWindowTitle(titulo)
+        dialogo.setMinimumWidth(480)
+        dialogo.setStyleSheet("""
+            QDialog { background-color: #FBFAF6; }
+            QLabel { color: #33465F; font-size: 14px; font-weight: normal; }
+            QLineEdit, QComboBox {
+                background-color: white; color: #102848;
+                border: 1px solid #D9D2C2; border-radius: 8px;
+                padding: 10px; font-size: 14px;
+                selection-background-color: #F4EBD5; selection-color: #102848;
+            }
+            QLineEdit:focus, QComboBox:focus { border-color: #C09848; }
+            QComboBox QAbstractItemView {
+                background-color: white; color: #102848;
+                selection-background-color: #F4EBD5; selection-color: #102848;
+            }
+            QPushButton#guardarCambios:hover { background-color: #3F6B36; }
+        """)
+        formulario = QFormLayout(dialogo)
+        formulario.setContentsMargins(24, 24, 24, 24)
+        formulario.setSpacing(14)
+        formulario.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        return dialogo, formulario
+
+    def botonesActualizacion(self, dialogo, formulario, guardar):
+        botones = QHBoxLayout()
+        cancelar = QPushButton("Cancelar")
+        cancelar.setObjectName("cancelar_accion")
+        cancelar.clicked.connect(dialogo.reject)
+        enviar = QPushButton("Guardar cambios")
+        enviar.setObjectName("guardarCambios")
+        enviar.clicked.connect(guardar)
+        botones.addWidget(cancelar)
+        botones.addWidget(enviar)
+        formulario.addRow(botones)
+
+    def actualizarCliente(self):
+        cliente = self.clienteSeleccionado()
+        if cliente is None or cliente.get("id") is None:
+            QMessageBox.warning(self, "Cliente no seleccionado", "Selecciona un cliente para actualizar sus datos.")
+            return
+        dialogo, formulario = self.formularioActualizacion("Actualizar cliente")
+        campos = {}
+        for clave, etiqueta in (
+            ("nombre", "Nombre:"), ("cedula", "Cédula:"),
+            ("correo", "Correo:"), ("direccion", "Dirección:")
+        ):
+            campo = QLineEdit(str(cliente.get(clave) or ""))
+            campo.setObjectName(clave)
+            campos[clave] = campo
+            formulario.addRow(etiqueta, campo)
+        password = QLineEdit()
+        password.setObjectName("password")
+        password.setEchoMode(QLineEdit.Password)
+        password.setMaxLength(128)
+        password.setPlaceholderText("Dejar vacío para conservar la actual")
+        formulario.addRow("Nueva contraseña:", password)
+
+        def guardar():
+            datos = {clave: campo.text().strip() for clave, campo in campos.items()}
+            nueva_password = password.text()
+            error = validar_datos_cliente(
+                datos["nombre"], datos["cedula"], datos["correo"],
+                nueva_password or "********", datos["direccion"]
+            ) or validar_cliente_unico(
+                [c for c in self.clientes if c.get("id") != cliente["id"]],
+                datos["cedula"], datos["correo"]
+            )
+            if error:
+                QMessageBox.warning(dialogo, "Datos inválidos", error)
+                return
+            if nueva_password:
+                datos["password"] = nueva_password
+            if all(cliente.get(clave) == valor for clave, valor in datos.items()):
+                dialogo.accept()
+                return
+            try:
+                actualizado = actualizar_cliente(
+                    int(cliente["id"]), datos["nombre"], datos["cedula"],
+                    datos["correo"], datos["direccion"], cliente.get("monto", 0),
+                    password=nueva_password or None
+                )
+            except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+                QMessageBox.critical(dialogo, "Error al actualizar", f"No se pudo guardar el cliente: {error}")
+                return
+            if not actualizado:
+                QMessageBox.warning(dialogo, "Sin actualización", "No se guardaron cambios. Recarga los clientes e inténtalo de nuevo.")
+                return
+            cliente.update(datos)
+            self.clientesBuscar.clear()
+            self.buscarCliente()
+            for fila in range(self.listaClientes.count()):
+                item = self.listaClientes.item(fila)
+                if self.clientes[item.data(Qt.ItemDataRole.UserRole)].get("id") == cliente["id"]:
+                    self.listaClientes.setCurrentRow(fila)
+                    self.mostrarCliente(item)
+                    break
+            dialogo.accept()
+            QMessageBox.information(self, "Cliente actualizado", "Los cambios se guardaron en la base de datos.")
+
+        self.botonesActualizacion(dialogo, formulario, guardar)
+        dialogo.exec()
+
+    def eliminarCliente(self):
+        item_seleccionado = self.listaClientes.currentItem()
+        indice_cliente = (
+            item_seleccionado.data(Qt.ItemDataRole.UserRole)
+            if item_seleccionado
+            else -1
+        )
+
+        if indice_cliente < 0 or indice_cliente >= len(self.clientes):
+            QMessageBox.warning(
+                self,
+                "Cliente no seleccionado",
+                "Selecciona un cliente para eliminarlo."
+            )
+            return
+
+        cliente = self.clientes[indice_cliente]
+        respuesta = QMessageBox.question(
+            self,
+            "Confirmar eliminacion",
+            f"Estas seguro de eliminar al cliente {cliente['nombre']}?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if respuesta != QMessageBox.Yes:
+            return
+
+        cliente_id = cliente.get("id")
+        if cliente_id is None:
+            QMessageBox.warning(
+                self,
+                "Cliente no valido",
+                "El cliente seleccionado no tiene un identificador de base de datos."
+            )
+            return
+
+        try:
+            eliminado = eliminar_cliente(int(cliente_id))
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Error al eliminar cliente",
+                f"No se pudo eliminar el cliente: {error}"
+            )
+            return
+
+        if not eliminado:
+            QMessageBox.warning(
+                self,
+                "Cliente no encontrado",
+                "El cliente no existe en la base de datos."
+            )
+            return
+
+        self.clientes.pop(indice_cliente)
+        self.buscarCliente()
+        self.listaClientes.setCurrentRow(-1)
+        self.tablaPrestamos.setRowCount(0)
+        self.lblCliente.setText("Seleccione un cliente")
+        self.lblCorreo.setText("Correo: -")
+        self.lblDir.setText("Direccion: -")
+
+        QMessageBox.information(
+            self,
+            "Cliente eliminado",
+            f"El cliente {cliente['nombre']} fue eliminado."
+        )
+
+    
+
     def crearCl(self):
 
         layoutCC = QWidget()
@@ -681,30 +994,30 @@ class RecepWindow(QMainWindow):
 
         layoutCC.setStyleSheet("""
     QWidget#formCC {
-        background-color: #f8fafc;
+        background-color: #FBFAF6;
     }
 
     QLineEdit {
         background-color: white;
-        color: #1e293b;
-        border: 1px solid #cbd5e1;
+        color: #102848;
+        border: 1px solid #D9D2C2;
         border-radius: 8px;
         padding: 10px 12px;
         font-size: 14px;
-        selection-background-color: #bfdbfe;
-        selection-color: #1e293b;
+        selection-background-color: #E6D3A5;
+        selection-color: #102848;
     }
 
     QLineEdit:hover {
-        border-color: #94a3b8;
+        border-color: #A69D89;
     }
 
     QLineEdit:focus {
-        border-color: #3b82f6;
+        border-color: #C09848;
     }
 
     QPushButton#btnEnviar {
-        background-color: #2563eb;
+        background-color: #183A60;
         color: white;
         border: none;
         border-radius: 8px;
@@ -714,11 +1027,11 @@ class RecepWindow(QMainWindow):
     }
 
     QPushButton#btnEnviar:hover {
-        background-color: #1d4ed8;
+        background-color: #0B1C32;
     }
 
     QPushButton#btnEnviar:pressed {
-        background-color: #1e40af;
+        background-color: #0B1C32;
     }
 """)
 
@@ -731,6 +1044,7 @@ class RecepWindow(QMainWindow):
         self.infoName.setMaxLength(80)
 
         self.infoEmail = QLineEdit("")
+        self.infoEmail.setMaxLength(100)
         self.infoEmail.setPlaceholderText(
             "Ingresa tu correo electronico..."
         )
@@ -807,11 +1121,11 @@ class RecepWindow(QMainWindow):
             return
 
         self.newCl = {
-            "nombre": self.infoName.text(),
-            "cedula": self.infoCedula.text(),
-            "correo": self.infoEmail.text(),
+            "nombre": self.infoName.text().strip(),
+            "cedula": self.infoCedula.text().strip(),
+            "correo": self.infoEmail.text().strip(),
             "password": self.infoPassword.text(),
-            "direccion": self.infoDir.text()
+            "direccion": self.infoDir.text().strip()
         }
 
         try:
@@ -909,68 +1223,79 @@ class RecepWindow(QMainWindow):
         dialogo.setMinimumWidth(520)
         dialogo.setStyleSheet("""
             QDialog#solicitudPrestamo {
-                background-color: #f8fafc;
-                color: #1e293b;
+                background-color: #FBFAF6;
+                color: #102848;
             }
 
             QDialog#solicitudPrestamo QLabel {
-                color: #334155;
+                color: #33465F;
                 font-size: 14px;
                 font-weight: normal;
             }
 
             QDialog#solicitudPrestamo QLabel#clienteSolicitud {
-                color: #1e293b;
+                color: #102848;
                 font-size: 15px;
                 font-weight: bold;
             }
 
             QDialog#solicitudPrestamo QDoubleSpinBox,
-            QDialog#solicitudPrestamo QSpinBox {
+            QDialog#solicitudPrestamo QSpinBox,
+            QDialog#solicitudPrestamo QComboBox {
                 background-color: white;
-                color: #1e293b;
-                border: 1px solid #cbd5e1;
+                color: #102848;
+                border: 1px solid #D9D2C2;
                 border-radius: 8px;
                 padding: 9px 10px;
                 font-size: 14px;
-                selection-background-color: #bfdbfe;
-                selection-color: #1e293b;
+                selection-background-color: #E6D3A5;
+                selection-color: #102848;
             }
 
             QDialog#solicitudPrestamo QDoubleSpinBox:hover,
-            QDialog#solicitudPrestamo QSpinBox:hover {
-                border-color: #94a3b8;
+            QDialog#solicitudPrestamo QSpinBox:hover,
+            QDialog#solicitudPrestamo QComboBox:hover {
+                border-color: #A69D89;
             }
 
             QDialog#solicitudPrestamo QDoubleSpinBox:focus,
-            QDialog#solicitudPrestamo QSpinBox:focus {
-                border: 1px solid #3b82f6;
+            QDialog#solicitudPrestamo QSpinBox:focus,
+            QDialog#solicitudPrestamo QComboBox:focus {
+                border: 1px solid #C09848;
+            }
+
+            QDialog#solicitudPrestamo QComboBox QAbstractItemView {
+                background-color: white;
+                color: #102848;
+                selection-background-color: #F4EBD5;
+                selection-color: #102848;
+                border: 1px solid #D9D2C2;
             }
 
             QDialog#solicitudPrestamo QLabel#interesSolicitud,
             QDialog#solicitudPrestamo QLabel#totalSolicitud,
             QDialog#solicitudPrestamo QLabel#cuotaSolicitud {
                 background-color: white;
-                border: 1px solid #cbd5e1;
+                border: 1px solid #D9D2C2;
                 border-radius: 8px;
                 padding: 9px 10px;
-                color: #1e293b;
+                color: #102848;
                 font-size: 14px;
                 font-weight: bold;
             }
 
             QDialog#solicitudPrestamo QLabel#totalSolicitud {
-                background-color: #eff6ff;
-                border-color: #bfdbfe;
-                color: #1d4ed8;
+                background-color: #FAF7EF;
+                border-color: #E6D3A5;
+                color: #0B1C32;
             }
 
             QDialog#solicitudPrestamo QLabel#avisoSolicitud {
-                background-color: #eff6ff;
-                border: 1px solid #bfdbfe;
+                background-color: #FAF7EF;
+                border: 1px solid #E6D3A5;
                 border-radius: 8px;
                 padding: 10px;
-                color: #1e3a8a;
+                color: #102848;
                 font-size: 13px;
             }
 
@@ -983,30 +1308,30 @@ class RecepWindow(QMainWindow):
             }
 
             QDialog#solicitudPrestamo QPushButton#btnEnviarSolicitud {
-                background-color: #2563eb;
+                background-color: #183A60;
                 color: white;
-                border: 1px solid #2563eb;
+                border: 1px solid #183A60;
             }
 
             QDialog#solicitudPrestamo QPushButton#btnEnviarSolicitud:hover {
-                background-color: #1d4ed8;
-                border-color: #1d4ed8;
+                background-color: #0B1C32;
+                border-color: #0B1C32;
             }
 
             QDialog#solicitudPrestamo QPushButton#btnCancelarSolicitud {
                 background-color: white;
-                color: #334155;
-                border: 1px solid #cbd5e1;
+                color: #33465F;
+                border: 1px solid #D9D2C2;
             }
 
             QDialog#solicitudPrestamo QPushButton#btnCancelarSolicitud:hover {
-                background-color: #f1f5f9;
-                border-color: #94a3b8;
+                background-color: #F4F1E8;
+                border-color: #A69D89;
             }
 
             QDialog#solicitudPrestamo QPushButton:disabled {
-                background-color: #94a3b8;
-                border-color: #94a3b8;
+                background-color: #A69D89;
+                border-color: #A69D89;
                 color: white;
             }
         """)
@@ -1049,6 +1374,11 @@ class RecepWindow(QMainWindow):
         plazo_input.setRange(1, 360)
         plazo_input.setSuffix(" cuotas")
         plazo_input.setKeyboardTracking(False)
+        frecuencia_input = QComboBox()
+        frecuencia_input.setObjectName("frecuenciaSolicitud")
+        frecuencia_input.addItems(["Semanal", "Quincenal", "Mensual"])
+        frecuencia_input.setCurrentText("Mensual")
+        frecuencia_input.setToolTip("Semanal: cada 7 días. Quincenal: cada 15 días. Mensual: cada mes.")
 
         interes_label = QLabel()
         interes_label.setObjectName("interesSolicitud")
@@ -1080,7 +1410,9 @@ class RecepWindow(QMainWindow):
             total = calcular_total_prestamo(monto)
             interes_label.setText(f"C$ {calcular_interes(monto):,.2f}")
             total_label.setText(f"C$ {total:,.2f}")
-            cuota_label.setText(f"C$ {total / plazo_input.value():,.2f}")
+            cuota_label.setText(
+                f"C$ {total / plazo_input.value():,.2f} · {frecuencia_input.currentText().lower()}"
+            )
             enviar.setEnabled(monto > 0 and ingreso_input.value() > 0)
 
         def enviar_solicitud():
@@ -1108,6 +1440,7 @@ class RecepWindow(QMainWindow):
                     monto_input.value(),
                     plazo_input.value(),
                     ingreso_mensual=ingreso_input.value(),
+                    frecuencia_pago=frecuencia_input.currentText(),
                 )
             except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
                 QMessageBox.critical(
@@ -1126,16 +1459,19 @@ class RecepWindow(QMainWindow):
                 f"Monto: C$ {monto_input.value():,.2f}\n"
                 f"Ingreso mensual: C$ {ingreso_input.value():,.2f}\n"
                 f"Plazo: {plazo_input.value()} cuotas\n"
+                f"Frecuencia de pago: {frecuencia_input.currentText()}\n"
                 "Estado: Pendiente de aprobación por administración."
             )
 
         monto_input.valueChanged.connect(actualizar_resumen)
         ingreso_input.valueChanged.connect(actualizar_resumen)
         plazo_input.valueChanged.connect(actualizar_resumen)
+        frecuencia_input.currentTextChanged.connect(actualizar_resumen)
         botones.accepted.connect(enviar_solicitud)
         formulario.addRow("Ingreso mensual del cliente:", ingreso_input)
         formulario.addRow("Monto solicitado:", monto_input)
         formulario.addRow("Plazo:", plazo_input)
+        formulario.addRow("Frecuencia de pago:", frecuencia_input)
         formulario.addRow(f"Interés ({PORCENTAJE_INTERES:.0f}%):", interes_label)
         formulario.addRow("Total a pagar:", total_label)
         formulario.addRow("Cuota estimada:", cuota_label)

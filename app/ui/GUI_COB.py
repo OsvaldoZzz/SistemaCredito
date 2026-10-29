@@ -1,14 +1,16 @@
+from app.config.rutas import IMAGENES_DIR
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
 from mysql.connector import Error as MySQLConnectorError
-from clientes_crud import crear_cliente, listar_clientes
-from prestamos_crud import listar_prestamos, listar_todos_los_prestamos
-from pagos_ui import abrir_dialogo_abono
-from reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
-from validaciones import validar_cliente_unico, validar_datos_cliente
-from calculos_prestamo import (
+from app.datos.clientes_crud import crear_cliente, listar_clientes
+from app.datos.prestamos_crud import listar_prestamos, listar_todos_los_prestamos
+from app.ui.pagos_ui import abrir_dialogo_abono
+from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
+from app.reportes.reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
+from app.logica.validaciones import validar_cliente_unico, validar_datos_cliente
+from app.logica.calculos_prestamo import (
     PORCENTAJE_INTERES,
     calcular_interes,
     calcular_total_prestamo,
@@ -30,29 +32,30 @@ class CobWindow(QMainWindow):
     def setCob(self):
         self.showMaximized()
         self.setWindowTitle("Panel Cobrador")
-        self.setWindowIcon(QIcon("img/logoBG.png"))
+        self.setWindowIcon(QIcon(str(IMAGENES_DIR / "logoBG.png")))
 
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #f5f6fa;
+                background-color: #F6F5F1;
             }
 
             /* ENCABEZADO */
 
             QWidget#encabezado {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
+                border-bottom: 3px solid #C09848;
             }
 
             QLabel#tituloPanel {
-                color: #1e293b;
+                color: #102848;
                 font-size: 22px;
                 font-weight: bold;
             }
 
             QLabel#infoUsuario {
-                color: #64748b;
+                color: #65758B;
                 font-size: 16px;
                 font-weight: bold;
             }
@@ -60,50 +63,62 @@ class CobWindow(QMainWindow):
             /* TITULOS */
 
             QLabel {
-                color: #1e293b;
+                color: #102848;
                 font-size: 18px;
                 font-weight: bold;
             }
 
             QLabel#lblCliente {
-                color: #1e293b;
+                color: #102848;
                 font-size: 20px;
                 font-weight: bold;
             }
 
             QLabel#lblCorreo {
-                color: #64748b;
+                color: #65758B;
                 font-size: 14px;
                 font-weight: normal;
             }
 
             QLabel#lblDir {
             margin-bottom: 5px;
-                color: #64748b;
+                color: #65758B;
                 font-size: 14px;
                 font-weight: normal;
             }
 
             QLineEdit#lineaEdit {
-                background-color: #f5f5f5;
-                border: 1px solid #d1d5db;
+                background-color: #F4F2EC;
+                border: 1px solid #DDD8CB;
                 border-radius: 8px;
                 padding: 5px;
-                color: #000;
+                color: #102848;
             }
 
             QPushButton#btnBuscar {
+                background-color: #F4F2EC;
+                border: 1px solid #DDD8CB;
                 padding: 5px;
+            }
+
+            QPushButton#btnBuscar:hover:enabled:!pressed {
+                background-color: #E8E3D7;
+                border-color: #C09848;
+            }
+
+            QPushButton#btnBuscar:pressed:enabled {
+                background-color: #D9D2C2;
+                border-color: #A69D89;
             }
 
             /* LISTA DE CLIENTES */
 
             QListWidget {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
                 padding: 8px;
-                color: #1e293b;
+                color: #102848;
                 font-size: 15px;
             }
 
@@ -114,11 +129,11 @@ class CobWindow(QMainWindow):
             }
 
             QListWidget::item:hover {
-                background-color: #e8f0fe;
+                background-color: #F4EBD5;
             }
 
             QListWidget::item:selected {
-                background-color: #3b82f6;
+                background-color: #102848;
                 color: white;
             }
 
@@ -126,39 +141,90 @@ class CobWindow(QMainWindow):
 
             QWidget#panelPrestamos {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
             }
 
             QWidget#panelClientes {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
+            }
+
+            QWidget#panelAcciones {
+                background-color: white;
             }
 
             /* TABLA */
 
             QTableWidget {
                 background-color: white;
-                border: 1px solid #d1d5db;
+                border: 1px solid #DDD8CB;
                 border-radius: 10px;
-                color: #1e293b;
+                color: #102848;
                 font-size: 15px;
-                gridline-color: #e5e7eb;
+                gridline-color: #E8E3D7;
             }
 
             QHeaderView::section {
-                background-color: #3B82F6;
+                background-color: #102848;
                 color: white;
                 padding: 10px;
                 border: none;
+                border-bottom: 2px solid #C09848;
                 font-weight: bold;
+            }
+
+            QPushButton#acciones {
+                background-color: #FBFAF6;
+                color: #102848;
+                border: 1px solid #D9D2C2;
+                border-radius: 6px;
+                padding: 2px;
+                min-width: 0px;
+                min-height: 0px;
+            }
+
+            QPushButton#acciones:hover {
+                background-color: #F4EBD5;
+                border-color: #C09848;
+            }
+
+            QDialog#detallePrestamo {
+                background-color: #FBFAF6;
+            }
+
+            QLabel#notaPrestamo {
+                background-color: #FAF7EF;
+                border: 1px solid #E6D3A5;
+                border-radius: 8px;
+                padding: 10px;
+                color: #102848;
+                font-size: 13px;
+            }
+
+            QLabel#resumenPrestamo {
+                background-color: white;
+                border: 1px solid #D9D2C2;
+                border-radius: 8px;
+                padding: 10px;
+                color: #102848;
+                font-size: 14px;
+            }
+
+            QTableWidget#tablaDetallePrestamo {
+                background-color: white;
+                alternate-background-color: #FBFAF6;
+                border: 1px solid #D9D2C2;
+                border-radius: 8px;
+                gridline-color: #E8E3D7;
+                font-size: 13px;
             }
 
             /* BOTONES */
 
             QPushButton {
-                background-color: #3B82F6;
+                background-color: #102848;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -168,19 +234,19 @@ class CobWindow(QMainWindow):
             }
 
             QPushButton:hover {
-                background-color: #2563eb;
+                background-color: #183A60;
             }
 
             QPushButton:hover#crear_cliente {
-                background-color: green;
+                background-color: #3F6B36;
             }
 
             QPushButton:hover#reportCart {
-                background-color: gold;
+                background-color: #8A6B2B;
             }
 
             QPushButton:hover#reportCob {
-                background-color: gold;
+                background-color: #8A6B2B;
             }
 
             QPushButton:hover#cerrarSesion {
@@ -188,26 +254,26 @@ class CobWindow(QMainWindow):
             }
 
             QPushButton:hover#solicitar_prestamo {
-                background-color: green;
+                background-color: #3F6B36;
             }
 
             QPushButton:hover#abonar_prestamo {
-                background-color: green;
+                background-color: #8A6B2B;
             }
 
             QMessageBox {
-                background-color: #f5f5f5;
-                color: #000;
+                background-color: #F4F2EC;
+                color: #102848;
             }
 
             QMessageBox QLabel {
-                color: #000;
+                color: #102848;
                 font-size: 14px;
                 font-weight: normal;
             }
 
             QMessageBox QPushButton {
-                background-color: #3B82F6;
+                background-color: #102848;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -218,7 +284,7 @@ class CobWindow(QMainWindow):
             }
 
             QMessageBox QPushButton:hover {
-                background-color: green;
+                background-color: #3F6B36;
             }
         """)
 
@@ -271,7 +337,7 @@ class CobWindow(QMainWindow):
 
         self.btnBuscar = QPushButton()
         self.btnBuscar.setObjectName("btnBuscar")
-        self.btnBuscar.setIcon(QIcon("img/lupa.png"))
+        self.btnBuscar.setIcon(QIcon(str(IMAGENES_DIR / "lupa.png")))
         self.btnBuscar.setIconSize(QSize(24, 24))
         self.btnBuscar.clicked.connect(self.buscarCliente)
 
@@ -303,9 +369,6 @@ class CobWindow(QMainWindow):
         self.btnReporteCobrador = QPushButton("Reporte Cobranza PDF")
         self.btnReporteCobrador.setObjectName("reportCob")
 
-        self.btnActualizar = QPushButton("Actualizar datos")
-        self.btnActualizar.clicked.connect(self.actualizarDatos)
-
         self.btnCerrar = QPushButton("Cerrar Sesion")
         self.btnCerrar.setObjectName("cerrarSesion")
 
@@ -320,7 +383,6 @@ class CobWindow(QMainWindow):
             self.btnAbonarPrestamo,
             self.btnReporteCartera,
             self.btnReporteCobrador,
-            self.btnActualizar,
             self.btnCerrar,
         )
         for boton in botones:
@@ -329,8 +391,7 @@ class CobWindow(QMainWindow):
         botonesLayout.addWidget(self.btnAbonarPrestamo, 0, 0)
         botonesLayout.addWidget(self.btnReporteCartera, 0, 1)
         botonesLayout.addWidget(self.btnReporteCobrador, 1, 0)
-        botonesLayout.addWidget(self.btnActualizar, 1, 1)
-        botonesLayout.addWidget(self.btnCerrar, 2, 0, 1, 2)
+        botonesLayout.addWidget(self.btnCerrar, 1,1)
 
         clientesLayout.addLayout(botonesLayout)
 
@@ -373,7 +434,7 @@ class CobWindow(QMainWindow):
 
         self.tablaPrestamos = QTableWidget()
 
-        self.tablaPrestamos.setColumnCount(6)
+        self.tablaPrestamos.setColumnCount(7)
         self.tablaPrestamos.setEditTriggers(
             QAbstractItemView.NoEditTriggers
         )
@@ -387,7 +448,8 @@ class CobWindow(QMainWindow):
             f"Interés ({PORCENTAJE_INTERES:.0f}%)",
             "Total a pagar",
             "Cuotas pendientes",
-            "Estado"
+            "Estado",
+            "Acciones",
         ])
 
         self.tablaPrestamos.setObjectName("tablaPrestamos")
@@ -396,6 +458,9 @@ class CobWindow(QMainWindow):
 
         self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch
+        )
+        self.tablaPrestamos.horizontalHeader().setSectionResizeMode(
+            6, QHeaderView.ResizeToContents
         )
 
         prestamosLayout.addWidget(
@@ -531,6 +596,49 @@ class CobWindow(QMainWindow):
                 self.tablaPrestamos.setItem(
                     fila, columna, QTableWidgetItem(valor)
                 )
+            self.agregarAccionVerPrestamo(fila)
+            self.tablaPrestamos.setRowHeight(fila, 42)
+
+    def agregarAccionVerPrestamo(self, fila):
+        acciones = QWidget()
+        acciones.setObjectName("panelAcciones")
+        layout = QHBoxLayout(acciones)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        boton_ver = QPushButton()
+        boton_ver.setObjectName("acciones")
+        boton_ver.setFixedSize(34, 34)
+        boton_ver.setIcon(
+            QIcon(str(IMAGENES_DIR / "ver.png"))
+        )
+        boton_ver.setIconSize(QSize(25, 25))
+        boton_ver.setToolTip("Ver cuotas, pagos y mora")
+        boton_ver.clicked.connect(self.verPrestamoDesdeBoton)
+        layout.addWidget(boton_ver)
+        self.tablaPrestamos.setCellWidget(fila, 6, acciones)
+
+    def verPrestamoDesdeBoton(self):
+        boton = self.sender()
+        contenedor = boton.parentWidget() if boton is not None else None
+        fila = next(
+            (
+                indice
+                for indice in range(self.tablaPrestamos.rowCount())
+                if self.tablaPrestamos.cellWidget(indice, 6) is contenedor
+            ),
+            -1,
+        )
+        if fila < 0:
+            return
+
+        id_item = self.tablaPrestamos.item(fila, 0)
+        if id_item is None:
+            return
+        try:
+            mostrar_detalle_prestamo(self, int(id_item.text()))
+        except (MySQLConnectorError, OSError, TypeError, ValueError) as error:
+            mostrar_error_detalle_prestamo(self, error)
 
     def buscarCliente(self):
         cedula = self.clientesBuscar.text().strip().casefold()
@@ -691,16 +799,16 @@ class CobWindow(QMainWindow):
 
         layoutCC.setStyleSheet("""
             #formCC {
-                background-color: #f5f5f5;
+                background-color: #F4F2EC;
             }
 
             QLineEdit {
-                background-color: #D3D3D3;
-                color: #000;
+                background-color: #F4F1E8;
+                color: #102848;
             }
 
             QPushButton {
-                background-color: #3B82F6;
+                background-color: #102848;
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -710,7 +818,7 @@ class CobWindow(QMainWindow):
             }
 
             QPushButton:hover {
-                background-color: green;
+                background-color: #3F6B36;
             }
         """)
 
@@ -723,6 +831,7 @@ class CobWindow(QMainWindow):
         self.infoName.setMaxLength(80)
 
         self.infoEmail = QLineEdit("")
+        self.infoEmail.setMaxLength(100)
         self.infoEmail.setPlaceholderText(
             "Ingresa tu correo electronico..."
         )
@@ -799,11 +908,11 @@ class CobWindow(QMainWindow):
             return
 
         self.newCl = {
-            "nombre": self.infoName.text(),
-            "cedula": self.infoCedula.text(),
-            "correo": self.infoEmail.text(),
+            "nombre": self.infoName.text().strip(),
+            "cedula": self.infoCedula.text().strip(),
+            "correo": self.infoEmail.text().strip(),
             "password": self.infoPassword.text(),
-            "direccion": self.infoDir.text()
+            "direccion": self.infoDir.text().strip()
         }
 
         try:
