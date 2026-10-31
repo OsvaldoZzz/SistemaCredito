@@ -1,3 +1,5 @@
+from app.ui.mapa_dialogo import ver_ubicacion
+from app.ui.ubicacion_ui import CampoUbicacion, boton_ubicacion
 from app.config.rutas import IMAGENES_DIR
 from datetime import date
 from PySide6.QtWidgets import *
@@ -632,7 +634,13 @@ class AdminWindow(QMainWindow):
 
         prestamosTitulo = QLabel("Préstamos del cliente")
         prestamosTitulo.setObjectName("tituloPrestamosCliente")
-        prestamosLayout.addWidget(prestamosTitulo)
+        encabezadoPrestamos = QHBoxLayout()
+        encabezadoPrestamos.addWidget(prestamosTitulo, 1)
+
+        self.btnVerMapa = boton_ubicacion()
+        self.btnVerMapa.clicked.connect(self.verUbicacionCliente)
+        encabezadoPrestamos.addWidget(self.btnVerMapa)
+        prestamosLayout.addLayout(encabezadoPrestamos)
 
         self.lblCliente = QLabel("Seleccione un cliente")
         self.lblCliente.setObjectName("lblCliente")
@@ -1037,6 +1045,14 @@ class AdminWindow(QMainWindow):
             self.agregarAccionesPrestamo(fila)
             self.tablaPrestamos.setRowHeight(fila, 42)
 
+    def verUbicacionCliente(self):
+        cliente = self.clienteSeleccionado()
+        if cliente is None:
+            QMessageBox.information(self, "Selecciona un cliente", "Selecciona un cliente para ver su ubicación.")
+            return
+        ver_ubicacion(self, cliente["nombre"], cliente.get("direccion") or "",
+                      cliente.get("latitud"), cliente.get("longitud"))
+
     def mostrarCliente(self, item):
         indice_cliente = item.data(Qt.ItemDataRole.UserRole)
         if indice_cliente is None:
@@ -1198,6 +1214,9 @@ class AdminWindow(QMainWindow):
         password.setPlaceholderText("Dejar vacío para conservar la actual")
         formulario.addRow("Nueva contraseña:", password)
 
+        ubicacion = CampoUbicacion(cliente.get("latitud"), cliente.get("longitud"), direccion=campos["direccion"])
+        formulario.addRow("Ubicación:", ubicacion)
+
         def guardar():
             datos = {clave: campo.text().strip() for clave, campo in campos.items()}
             nueva_password = password.text()
@@ -1213,6 +1232,10 @@ class AdminWindow(QMainWindow):
                 return
             if nueva_password:
                 datos["password"] = nueva_password
+            punto = (ubicacion.lat, ubicacion.lng)
+            punto_original = (cliente.get("latitud"), cliente.get("longitud"))
+            if punto != punto_original:
+                datos.update(latitud=ubicacion.lat, longitud=ubicacion.lng)
             if all(cliente.get(clave) == valor for clave, valor in datos.items()):
                 dialogo.accept()
                 return
@@ -1220,7 +1243,8 @@ class AdminWindow(QMainWindow):
                 actualizado = actualizar_cliente(
                     int(cliente["id"]), datos["nombre"], datos["cedula"],
                     datos["correo"], datos["direccion"], cliente.get("monto", 0),
-                    password=nueva_password or None
+                    password=nueva_password or None,
+                    **({"ubicacion": punto} if punto != punto_original else {}),
                 )
             except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
                 QMessageBox.critical(dialogo, "Error al actualizar", f"No se pudo guardar el cliente: {error}")
@@ -1537,6 +1561,8 @@ class AdminWindow(QMainWindow):
         form_layout.addWidget(self.infoEmail)
         form_layout.addWidget(self.infoPassword)
         form_layout.addWidget(self.infoDir)
+        self.infoUbicacion = CampoUbicacion(direccion=self.infoDir)
+        form_layout.addWidget(self.infoUbicacion)
         form_layout.addWidget(self.btnEnviar)
 
         layoutCC.show()
@@ -1582,7 +1608,9 @@ class AdminWindow(QMainWindow):
             "cedula": self.infoCedula.text().strip(),
             "correo": self.infoEmail.text().strip(),
             "password": self.infoPassword.text(),
-            "direccion": self.infoDir.text().strip()
+            "direccion": self.infoDir.text().strip(),
+            "latitud": self.infoUbicacion.lat,
+            "longitud": self.infoUbicacion.lng,
         }
 
         try:
@@ -1591,7 +1619,8 @@ class AdminWindow(QMainWindow):
                 self.newCl["cedula"],
                 self.newCl["correo"],
                 self.newCl["password"],
-                self.newCl["direccion"]
+                self.newCl["direccion"],
+                latitud=self.newCl["latitud"], longitud=self.newCl["longitud"],
             )
         except Exception as error:
             QMessageBox.critical(

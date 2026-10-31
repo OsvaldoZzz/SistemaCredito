@@ -1,3 +1,5 @@
+from app.ui.mapa_dialogo import ver_ubicacion
+from app.ui.ubicacion_ui import CampoUbicacion, boton_ubicacion
 from app.config.rutas import IMAGENES_DIR
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
@@ -410,7 +412,13 @@ class CobWindow(QMainWindow):
         botonesLayout2 = QHBoxLayout()
 
         prestamosTitulo = QLabel("Préstamos del cliente")
-        prestamosLayout.addWidget(prestamosTitulo)
+        encabezadoPrestamos = QHBoxLayout()
+        encabezadoPrestamos.addWidget(prestamosTitulo, 1)
+
+        self.btnVerMapa = boton_ubicacion()
+        self.btnVerMapa.clicked.connect(self.verUbicacionCliente)
+        encabezadoPrestamos.addWidget(self.btnVerMapa)
+        prestamosLayout.addLayout(encabezadoPrestamos)
 
         # Datos del cliente seleccionado
 
@@ -541,6 +549,14 @@ class CobWindow(QMainWindow):
         )
         self.listaClientes.setCurrentRow(fila)
         self.mostrarCliente(self.listaClientes.currentItem())
+
+    def verUbicacionCliente(self):
+        cliente = self.clienteSeleccionado()
+        if cliente is None:
+            QMessageBox.information(self, "Selecciona un cliente", "Selecciona un cliente para ver su ubicación.")
+            return
+        ver_ubicacion(self, cliente["nombre"], cliente.get("direccion") or "",
+                      cliente.get("latitud"), cliente.get("longitud"))
 
     def mostrarCliente(self, item):
         indice_cliente = item.data(Qt.ItemDataRole.UserRole)
@@ -867,6 +883,8 @@ class CobWindow(QMainWindow):
         form_layout.addWidget(self.infoEmail)
         form_layout.addWidget(self.infoPassword)
         form_layout.addWidget(self.infoDir)
+        self.infoUbicacion = CampoUbicacion(direccion=self.infoDir)
+        form_layout.addWidget(self.infoUbicacion)
         form_layout.addWidget(self.btnEnviar)
 
         layoutCC.show()
@@ -913,7 +931,9 @@ class CobWindow(QMainWindow):
             "cedula": self.infoCedula.text().strip(),
             "correo": self.infoEmail.text().strip(),
             "password": self.infoPassword.text(),
-            "direccion": self.infoDir.text().strip()
+            "direccion": self.infoDir.text().strip(),
+            "latitud": self.infoUbicacion.lat,
+            "longitud": self.infoUbicacion.lng,
         }
 
         try:
@@ -922,7 +942,8 @@ class CobWindow(QMainWindow):
                 self.newCl["cedula"],
                 self.newCl["correo"],
                 self.newCl["password"],
-                self.newCl["direccion"]
+                self.newCl["direccion"],
+                latitud=self.newCl["latitud"], longitud=self.newCl["longitud"],
             )
         except Exception as error:
             QMessageBox.critical(

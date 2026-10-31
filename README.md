@@ -20,6 +20,37 @@ La conexión admite las variables `DB_HOST`, `DB_PORT`, `DB_USER`,
 `DB_PASSWORD` y `DB_NAME`, configuradas en el entorno antes de iniciar.
 La base de datos debe disponer de las tablas `clientes` y `prestamo`.
 
+## Mapa de clientes
+
+Al crear clientes desde administración, recepción o cobranza se puede usar
+**Marcar en el mapa**. El administrador también puede cambiar el punto desde
+**Actualizar cliente**. La ubicación es opcional y se guarda con el formulario.
+El cliente puede editarla en **Mi dirección y ubicación**. Administración y
+cobranza tienen **Ver ubicación en el mapa**, con un botón para abrir la ruta
+en Google Maps. Si el cliente todavía no marcó un punto, se muestra un aviso.
+
+El mapa usa OpenStreetMap por defecto y requiere conexión a internet.
+Para el visor integrado debe estar disponible `PySide6-Addons`:
+
+```powershell
+python -m pip install PySide6-Addons
+```
+
+Si falta ese componente, el selector muestra instrucciones y la consulta de
+una ubicación guardada abre la ruta en el navegador.
+
+Se conserva la adaptación de Google Maps del proyecto `sistema-credito-mapa`.
+Para activarla, configura `GOOGLE_MAPS_API_KEY` o guarda la llave en
+`SistCreditos/google_maps_key.txt` (ignorado por Git). La llave debe tener
+habilitadas Maps JavaScript API y Geocoding API; si restringes referentes,
+incluye `https://sistema-crediticio.local/*`.
+
+Al consultar o crear clientes, el sistema comprueba las columnas `latitud` y
+`longitud` y agrega las que falten como `DECIMAL(10, 7) NULL`. La cuenta de
+MySQL necesita permiso `ALTER` para esta primera actualización. Los clientes
+existentes conservan sus datos y comienzan sin ubicación. No es necesario
+importar ni reemplazar la base de datos con el SQL del proyecto de origen.
+
 ## Organización
 
 ```text

@@ -1,3 +1,4 @@
+from app.ui.ubicacion_ui import CampoUbicacion
 from app.config.rutas import IMAGENES_DIR
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
@@ -1090,6 +1091,8 @@ class RecepWindow(QMainWindow):
         form_layout.addWidget(self.infoEmail)
         form_layout.addWidget(self.infoPassword)
         form_layout.addWidget(self.infoDir)
+        self.infoUbicacion = CampoUbicacion(direccion=self.infoDir)
+        form_layout.addWidget(self.infoUbicacion)
         form_layout.addWidget(self.btnEnviar)
 
         layoutCC.show()
@@ -1136,7 +1139,9 @@ class RecepWindow(QMainWindow):
             "cedula": self.infoCedula.text().strip(),
             "correo": self.infoEmail.text().strip(),
             "password": self.infoPassword.text(),
-            "direccion": self.infoDir.text().strip()
+            "direccion": self.infoDir.text().strip(),
+            "latitud": self.infoUbicacion.lat,
+            "longitud": self.infoUbicacion.lng,
         }
 
         try:
@@ -1145,7 +1150,8 @@ class RecepWindow(QMainWindow):
                 self.newCl["cedula"],
                 self.newCl["correo"],
                 self.newCl["password"],
-                self.newCl["direccion"]
+                self.newCl["direccion"],
+                latitud=self.newCl["latitud"], longitud=self.newCl["longitud"],
             )
         except (
             MySQLConnectorError,

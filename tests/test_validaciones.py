@@ -297,9 +297,13 @@ class FormulariosTest(unittest.TestCase):
                     window.enviarForm()
                     crear.assert_not_called()
                     window.infoEmail.setText("ana@example.com")
+                    window.infoUbicacion.lat = 12.4379
+                    window.infoUbicacion.lng = -86.878
                     window.enviarForm()
                     crear.assert_called_once()
                     self.assertEqual(crear.call_args.args[0], "Ana Perez")
+                    self.assertEqual(crear.call_args.kwargs, {"latitud": 12.4379, "longitud": -86.878})
+                    self.assertEqual(window.clientes[0]["latitud"], 12.4379)
                     self.assertEqual(window.clientes[0]["password"], "claveLarga12")
                 finally:
                     window.ventanaCrear.close()

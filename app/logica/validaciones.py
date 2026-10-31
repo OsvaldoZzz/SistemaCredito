@@ -123,7 +123,11 @@ def validar_datos_cliente(
     error = validar_password(password)
     if error:
         return error
-    if not 5 <= len(direccion.strip()) <= 40:
+    return validar_direccion(direccion)
+
+
+def validar_direccion(direccion: str) -> str | None:
+    if not isinstance(direccion, str) or not 5 <= len(direccion.strip()) <= 40:
         return "La dirección debe tener entre 5 y 40 caracteres."
     if any(ord(c) < 32 or ord(c) == 127 for c in direccion):
         return "La dirección no puede contener caracteres de control."

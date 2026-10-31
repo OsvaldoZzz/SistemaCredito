@@ -282,6 +282,10 @@ class ClienteWindow(QMainWindow):
 
         layoutFrame.addWidget(self.lblNombre)
         layoutFrame.addWidget(self.lblCorreo)
+        self.lblDireccion = QLabel(f"Dirección: {self.cliente.get('direccion') or '-'}")
+        self.lblDireccion.setTextFormat(Qt.TextFormat.PlainText)
+        self.lblDireccion.setWordWrap(True)
+        layoutFrame.addWidget(self.lblDireccion)
 
         # PRESTAMO
 
