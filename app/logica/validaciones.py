@@ -48,16 +48,29 @@ def validar_fecha(fecha: date, permitir_pasada=False) -> None:
 def validar_password(password: str) -> str | None:
     if not isinstance(password, str) or not password.strip():
         return "Ingresa una contraseña."
-    if not 8 <= len(password) <= 128:
-        return "La contraseña debe tener entre 8 y 128 caracteres."
+    if not 8 <= len(password) <= 12:
+        return "La contraseña debe tener entre 8 y 12 caracteres."
     if any(ord(c) < 32 or ord(c) == 127 for c in password):
         return "La contraseña no puede contener saltos de línea ni caracteres de control."
     return None
 
 
 def validar_datos_rol(usuario, password, rol, usuarios, excluir_id=None):
-    if not isinstance(usuario, str) or not re.fullmatch(r"[\w.-]{2,100}", usuario.strip()):
-        return "El usuario debe tener entre 2 y 100 letras, números, puntos, guiones o guiones bajos."
+    usuario_normalizado = usuario.strip() if isinstance(usuario, str) else ""
+    es_nombre = (
+        2 <= len(usuario_normalizado) <= 100
+        and any(caracter.isalpha() for caracter in usuario_normalizado)
+        and all(
+            caracter.isalnum() or caracter == " "
+            for caracter in usuario_normalizado
+        )
+    )
+    es_correo = (
+        len(usuario_normalizado) <= 100
+        and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", usuario_normalizado) is not None
+    )
+    if not (es_nombre or es_correo):
+        return "El nombre solo puede incluir letras, números y espacios, o ser un correo válido."
     if rol not in ("administrador", "recepcionista", "cobrador"):
         return "Selecciona un rol válido."
     error = validar_password(password)
@@ -73,13 +86,15 @@ def validar_campos_login(usuario: str, password: str) -> str | None:
         return "Ingresa tu usuario o correo."
     if not password.strip():
         return "Ingresa tu contraseña."
+    if not 8 <= len(password) <= 12:
+        return "La contraseña debe tener entre 8 y 12 caracteres."
     if "@" in usuario and not re.fullmatch(
         r"[^@\s]+@[^@\s]+\.[^@\s]+",
         usuario.strip(),
     ):
         return "Ingresa un correo electrónico válido."
-    if len(usuario.strip()) > 254 or len(password) > 128:
-        return "El usuario o la contraseña exceden la longitud permitida."
+    if len(usuario.strip()) > 254:
+        return "El usuario excede la longitud permitida."
     return None
 
 

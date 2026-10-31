@@ -124,7 +124,7 @@ def calcular_estado_cuota(
     fecha_vencimiento: date,
     pagos: list[dict],
     fecha_corte: date,
-) -> dict[str, Decimal | int]:
+) -> dict[str, Decimal | int | list[dict]]:
     validar_fecha(fecha_vencimiento, permitir_pasada=True)
     validar_fecha(fecha_corte, permitir_pasada=True)
     saldo_cuota = _importe_no_negativo(monto_cuota).quantize(
@@ -134,6 +134,7 @@ def calcular_estado_cuota(
     mora_pendiente = Decimal("0.00")
     mora_generada = Decimal("0.00")
     fecha_calculo = fecha_vencimiento
+    pagos_calculados = []
 
     for pago in sorted(pagos, key=lambda registro: registro["fecha_pago"]):
         fecha_pago = pago["fecha_pago"]
@@ -162,7 +163,13 @@ def calcular_estado_cuota(
             CENTAVO,
             rounding=ROUND_HALF_UP,
         )
+        mora_al_abono = mora_pendiente
         aplicado_a_mora = min(monto_pago, mora_pendiente)
+        pagos_calculados.append({
+            **pago,
+            "mora_al_abono": mora_al_abono,
+            "mora_aplicada": aplicado_a_mora,
+        })
         mora_pendiente -= aplicado_a_mora
         monto_pago -= aplicado_a_mora
         saldo_cuota = max(saldo_cuota - monto_pago, Decimal("0.00"))
@@ -189,4 +196,5 @@ def calcular_estado_cuota(
         "mora_generada": mora_generada,
         "dias_mora": dias_mora,
         "total_pendiente": saldo_cuota + mora_pendiente,
+        "pagos_calculados": pagos_calculados,
     }

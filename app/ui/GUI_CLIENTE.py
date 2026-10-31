@@ -6,6 +6,7 @@ from datetime import date
 from mysql.connector import Error as MySQLConnectorError
 from app.datos.citas_crud import crear_cita
 from app.datos.prestamos_crud import listar_prestamos
+from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
 from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
 
 
@@ -222,7 +223,7 @@ class ClienteWindow(QMainWindow):
             QMessageBox QPushButton:hover {
                 background-color: #3F6B36;
             }
-        """)
+        """ + ESTILOS_BOTONES_PANEL)
 
         central = QWidget()
         self.setCentralWidget(central)

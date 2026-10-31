@@ -3,7 +3,10 @@ from typing import Any
 
 from app.config.conexion import obtener_conexion
 from app.logica.calculos_prestamo import FRECUENCIAS_PAGO
-from app.datos.prestamos_crud import asegurar_esquema_prestamos
+from app.datos.prestamos_crud import (
+    asegurar_esquema_prestamos,
+    validar_cliente_sin_prestamos_pendientes,
+)
 from app.logica.validaciones import validar_condiciones_prestamo, validar_fecha, validar_id, validar_monto
 
 
@@ -59,8 +62,10 @@ def crear_solicitud_prestamo(
     conexion = obtener_conexion()
     cursor = None
     try:
-        cursor = conexion.cursor()
+        cursor = conexion.cursor(dictionary=True)
         _crear_tabla_solicitudes(cursor)
+        asegurar_esquema_prestamos(cursor)
+        validar_cliente_sin_prestamos_pendientes(cursor, cliente_id)
         cursor.execute(
             """
             INSERT INTO solicitudes_prestamo
@@ -141,6 +146,10 @@ def resolver_solicitud_prestamo(
             validar_condiciones_prestamo(solicitud["monto"], solicitud["plazo"])
             if solicitud["frecuencia_pago"] not in FRECUENCIAS_PAGO:
                 raise ValueError("La frecuencia de la solicitud no es válida.")
+            validar_cliente_sin_prestamos_pendientes(
+                cursor,
+                solicitud["cliente_id"],
+            )
             cursor.execute(
                 """
                 INSERT INTO prestamo

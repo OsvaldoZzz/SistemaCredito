@@ -8,6 +8,7 @@ from app.datos.clientes_crud import crear_cliente, listar_clientes
 from app.datos.prestamos_crud import listar_prestamos, listar_todos_los_prestamos
 from app.ui.pagos_ui import abrir_dialogo_abono
 from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
+from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
 from app.reportes.reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 from app.logica.validaciones import validar_cliente_unico, validar_datos_cliente
 from app.logica.calculos_prestamo import (
@@ -286,7 +287,7 @@ class CobWindow(QMainWindow):
             QMessageBox QPushButton:hover {
                 background-color: #3F6B36;
             }
-        """)
+        """ + ESTILOS_BOTONES_PANEL)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -847,7 +848,7 @@ class CobWindow(QMainWindow):
             "Ingresa tu contraseña..."
         )
         self.infoPassword.setEchoMode(QLineEdit.Password)
-        self.infoPassword.setMaxLength(128)
+        self.infoPassword.setMaxLength(12)
 
         self.infoDir = QLineEdit("")
         self.infoDir.setPlaceholderText(

@@ -34,7 +34,7 @@ def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
     encabezado.setObjectName("notaPrestamo")
     layout.addWidget(encabezado)
 
-    tabla = QTableWidget(len(cuotas), 12)
+    tabla = QTableWidget(len(cuotas), 13)
     tabla.setHorizontalHeaderLabels([
         "Cuota",
         "Vencimiento",
@@ -44,6 +44,7 @@ def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
         "Abonado",
         "Saldo cuota",
         "Días de mora",
+        "Mora acumulada",
         "Mora pendiente",
         "Total pendiente",
         "Último abono",
@@ -55,12 +56,14 @@ def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
     tabla.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
     mora_total = Decimal("0.00")
+    mora_generada_total = Decimal("0.00")
     total_actualizado = Decimal("0.00")
     capital_total = Decimal("0.00")
     interes_total = Decimal("0.00")
     abonado_total = Decimal("0.00")
     for indice, cuota in enumerate(cuotas):
         mora_total += cuota["mora_pendiente"]
+        mora_generada_total += cuota["mora_generada"]
         total_actualizado += cuota["total_pendiente"]
         capital_total += cuota["capital"]
         interes_total += cuota["interes"]
@@ -81,6 +84,7 @@ def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
             f"C$ {cuota['pagado']:,.2f}",
             f"C$ {cuota['saldo_cuota']:,.2f}",
             str(cuota["dias_mora"]),
+            f"C$ {cuota['mora_generada']:,.2f}",
             f"C$ {cuota['mora_pendiente']:,.2f}",
             f"C$ {cuota['total_pendiente']:,.2f}",
             (
@@ -92,7 +96,7 @@ def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
         )
         for columna, valor in enumerate(valores):
             item = QTableWidgetItem(valor)
-            if columna == 11:
+            if columna == 12:
                 item.setData(Qt.ItemDataRole.UserRole, estado)
                 item.setBackground(QColor(
                     "#dcfce7" if estado == "Pagada"
@@ -107,10 +111,38 @@ def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
             tabla.setItem(indice, columna, item)
     layout.addWidget(tabla)
 
+    pagos = [
+        pago
+        for cuota in cuotas
+        for pago in cuota.get("pagos_calculados", [])
+    ]
+    primer_abono = min(
+        pagos,
+        key=lambda pago: pago["fecha_pago"],
+        default=None,
+    )
+    if primer_abono is None:
+        resumen_primer_abono = "Aún no hay abonos registrados."
+    else:
+        fecha_primer_abono = primer_abono["fecha_pago"].strftime(
+            "%d/%m/%Y %H:%M:%S"
+        )
+        resumen_primer_abono = (
+            f"Primer abono: {fecha_primer_abono}   |   "
+            f"Mora acumulada al abono: "
+            f"C$ {primer_abono['mora_al_abono']:,.2f}   |   "
+            f"Mora cubierta por el abono: "
+            f"C$ {primer_abono['mora_aplicada']:,.2f}"
+        )
+    primer_abono_label = QLabel(resumen_primer_abono)
+    primer_abono_label.setObjectName("resumenPrestamo")
+    layout.addWidget(primer_abono_label)
+
     resumen = QLabel(
         f"Capital: C$ {capital_total:,.2f}   |   "
         f"Interés: C$ {interes_total:,.2f}   |   "
         f"Abonado: C$ {abonado_total:,.2f}   |   "
+        f"Mora acumulada: C$ {mora_generada_total:,.2f}   |   "
         f"Mora pendiente: C$ {mora_total:,.2f}   |   "
         f"Saldo total hoy: C$ {total_actualizado:,.2f}"
     )

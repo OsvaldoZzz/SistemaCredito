@@ -108,6 +108,7 @@ def _cargar_cuotas_prestamo(cursor, prestamo_id: int) -> list[dict[str, Any]]:
             ),
             "ultimo_pago": pagos[-1]["fecha_pago"] if pagos else None,
             "pagos": pagos,
+            "pagos_calculados": estado["pagos_calculados"],
         })
     return resultado
 
@@ -132,6 +133,30 @@ def _agregar_cuotas_pendientes(
             else "Activo"
         )
     return prestamos
+
+
+def validar_cliente_sin_prestamos_pendientes(cursor, cliente_id: int) -> None:
+    cursor.execute(
+        "SELECT id FROM clientes WHERE id = %s FOR UPDATE",
+        (cliente_id,),
+    )
+    if cursor.fetchone() is None:
+        raise ValueError("El cliente no existe.")
+
+    cursor.execute(
+        "SELECT id FROM prestamo WHERE cliente_id = %s FOR UPDATE",
+        (cliente_id,),
+    )
+    prestamos = cursor.fetchall()
+    for prestamo in prestamos:
+        if any(
+            cuota["total_pendiente"] > 0
+            for cuota in _cargar_cuotas_prestamo(cursor, prestamo["id"])
+        ):
+            raise ValueError(
+                "El cliente ya tiene un préstamo con saldo pendiente. "
+                "Debe liquidarlo antes de solicitar otro."
+            )
 
 
 def listar_cuotas_prestamo(prestamo_id: int) -> list[dict[str, Any]]:
@@ -382,8 +407,9 @@ def crear_prestamo(
     conexion = obtener_conexion()
     cursor = None
     try:
-        cursor = conexion.cursor()
+        cursor = conexion.cursor(dictionary=True)
         asegurar_esquema_prestamos(cursor)
+        validar_cliente_sin_prestamos_pendientes(cursor, cliente_id)
         cursor.execute(
             """
             INSERT INTO prestamo

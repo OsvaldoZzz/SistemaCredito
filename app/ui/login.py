@@ -153,7 +153,7 @@ class login(QMainWindow):
         self.input_password = QLineEdit()
         self.input_password.setPlaceholderText("Ingresar contraseña")
         self.input_password.setEchoMode(QLineEdit.Password)
-        self.input_password.setMaxLength(128)
+        self.input_password.setMaxLength(12)
         self.input_password.returnPressed.connect(self.iniciarSesion)
 
         botones_layout = QHBoxLayout() #Para poner los botones lado a lado.

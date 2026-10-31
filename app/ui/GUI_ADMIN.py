@@ -16,6 +16,7 @@ from app.datos.prestamos_crud import (
 )
 from app.ui.pagos_ui import abrir_dialogo_abono
 from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
+from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
 from app.datos.solicitudes_crud import (
     listar_solicitudes_pendientes,
     resolver_solicitud_prestamo,
@@ -201,12 +202,12 @@ class AdminWindow(QMainWindow):
             }
 
             /* Tarjeta de informacion del rol */
-            QWidget#tarjetaInfoRol, QWidget#tarjetaInfoCliente {
+            QWidget#tarjetaInfoRol {
                 background-color: #FAF7EF;
                 border: 1px solid #F4EBD5;
                 border-radius: 14px;
             }
-            QLabel#tituloInfoRol, QLabel#tituloInfoCliente {
+            QLabel#tituloInfoRol {
                 color: #102848; font-size: 14px; font-weight: bold;
             }
             QLabel#nombreInfoRol {
@@ -240,25 +241,6 @@ class AdminWindow(QMainWindow):
             QPushButton#asignar_clientes:disabled {
                 background-color: #E8E3D7; color: #65758B;
             }
-            QTableWidget#tablaClientesRol {
-                background-color: white; alternate-background-color: #FBFAF6;
-                color: #33465F; border: 1px solid #E8E3D7; border-radius: 12px;
-                font-size: 14px; selection-background-color: #F4EBD5;
-                selection-color: #102848; outline: none;
-            }
-            QTableWidget#tablaClientesRol QHeaderView::section {
-                background-color: #FAF7EF; color: #65758B;
-                border: none; border-bottom: 1px solid #F4EBD5;
-                padding: 14px 12px; font-size: 13px; font-weight: bold;
-            }
-            QTableWidget#tablaClientesRol::item {
-                border: none; padding: 8px 12px;
-            }
-            QTableWidget#tablaClientesRol::item:hover { background-color: #FAF7EF; }
-            QTableWidget#tablaClientesRol::item:selected {
-                background-color: #F4EBD5; color: #102848;
-            }
-
             QTabWidget::pane {
                 border: none;
                 background-color: white;
@@ -293,7 +275,13 @@ class AdminWindow(QMainWindow):
 
             /* PANELES */
 
-            QWidget#panelPrestamos, QWidget#panelRol {
+            QWidget#panelPrestamos {
+                background-color: white;
+                border: 1px solid #DDD8CB;
+                border-radius: 10px;
+            }
+
+            QWidget#panelRol {
                 background-color: white;
                 border: 1px solid #DDD8CB;
                 border-radius: 10px;
@@ -309,7 +297,7 @@ class AdminWindow(QMainWindow):
 
             QLabel#lblCliente {
                 color: #102848;
-                font-size: 16px;
+                font-size: 20px;
                 font-weight: bold;
             }
 
@@ -320,7 +308,7 @@ class AdminWindow(QMainWindow):
             }
 
             QLabel#lblDir {
-                margin-bottom: 0px;
+                margin-bottom: 5px;
                 color: #65758B;
                 font-size: 14px;
                 font-weight: normal;
@@ -510,7 +498,7 @@ class AdminWindow(QMainWindow):
             QMessageBox QPushButton:hover {
                 background-color: #3F6B36;
             }
-        """)
+        """ + ESTILOS_BOTONES_PANEL)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -639,20 +627,12 @@ class AdminWindow(QMainWindow):
         self.panelPrestamos = panelPrestamos
 
         prestamosLayout = QVBoxLayout(panelPrestamos)
-        prestamosLayout.setContentsMargins(16, 12, 16, 12)
-        prestamosLayout.setSpacing(10)
 
         botonesLayout2 = QHBoxLayout()
 
-        tarjetaCliente = QWidget()
-        tarjetaCliente.setObjectName("tarjetaInfoCliente")
-        tarjetaLayout = QVBoxLayout(tarjetaCliente)
-        tarjetaCliente.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
-        tarjetaLayout.setContentsMargins(14, 10, 14, 10)
-        tarjetaLayout.setSpacing(4)
-        tituloCliente = QLabel("Información del cliente")
-        tituloCliente.setObjectName("tituloInfoCliente")
-        tarjetaLayout.addWidget(tituloCliente)
+        prestamosTitulo = QLabel("Préstamos del cliente")
+        prestamosTitulo.setObjectName("tituloPrestamosCliente")
+        prestamosLayout.addWidget(prestamosTitulo)
 
         self.lblCliente = QLabel("Seleccione un cliente")
         self.lblCliente.setObjectName("lblCliente")
@@ -667,12 +647,7 @@ class AdminWindow(QMainWindow):
         for etiqueta in (self.lblCliente, self.lblCorreo, self.lblDir):
             etiqueta.setTextFormat(Qt.TextFormat.PlainText)
             etiqueta.setWordWrap(True)
-            tarjetaLayout.addWidget(etiqueta)
-        prestamosLayout.addWidget(tarjetaCliente)
-
-        prestamosTitulo = QLabel("Préstamos del cliente")
-        prestamosTitulo.setObjectName("tituloPrestamosCliente")
-        prestamosLayout.addWidget(prestamosTitulo)
+            prestamosLayout.addWidget(etiqueta)
 
 #===========================
 #tablas prestamos
@@ -840,7 +815,7 @@ class AdminWindow(QMainWindow):
         self.tablaClientesRol.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tablaClientesRol.setAlternatingRowColors(True)
         self.tablaClientesRol.setShowGrid(False)
-        self.tablaClientesRol.verticalHeader().setDefaultSectionSize(44)
+        self.tablaClientesRol.verticalHeader().setDefaultSectionSize(48)
         self.tablaClientesRol.verticalHeader().setVisible(False)
         self.tablaClientesRol.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         contenido.addWidget(self.tablaClientesRol, 1)
@@ -870,26 +845,52 @@ class AdminWindow(QMainWindow):
         return "local:" + cliente.setdefault("_id_asignacion", uuid4().hex)
 
     def mostrarClientesRol(self, usuario):
-        asignados = set(usuario.get("clientes_asignados", [])) if usuario else set()
-        clientes = [cliente for cliente in self.clientes
-                    if self.claveClienteAsignado(cliente) in asignados]
+        rol = self.rolActual()
+        if rol == "recepcionista":
+            self.tablaClientesRol.setColumnCount(4)
+            self.tablaClientesRol.setHorizontalHeaderLabels(
+                ["Nombre", "Cédula", "Correo", "Dirección"]
+            )
+            clientes = self.clientes
+        else:
+            asignados = set(usuario.get("clientes_asignados", [])) if usuario else set()
+            self.tablaClientesRol.setColumnCount(4)
+            self.tablaClientesRol.setHorizontalHeaderLabels([
+                "Nombre", "Cédula", "Correo", "Dirección"
+            ])
+            clientes = [
+                cliente
+                for cliente in self.clientes
+                if self.claveClienteAsignado(cliente) in asignados
+            ]
+
         self.tablaClientesRol.setRowCount(len(clientes))
         for fila, cliente in enumerate(clientes):
             for columna, clave in enumerate(("nombre", "cedula", "correo", "direccion")):
                 item = QTableWidgetItem(str(cliente.get(clave) or ""))
                 item.setToolTip(item.text())
                 self.tablaClientesRol.setItem(fila, columna, item)
-        self.lblTotalAsignados.setText(f"Clientes asignados: {len(clientes)}")
+        etiqueta_total = (
+            "Clientes disponibles para recepcionistas"
+            if rol == "recepcionista" else "Clientes asignados"
+        )
+        self.lblTotalAsignados.setText(f"{etiqueta_total}: {len(clientes)}")
+        self.btnAsignarClientes.setVisible(rol != "recepcionista")
         self.btnAsignarClientes.setEnabled(usuario is not None)
         self.lblSinAsignados.setText(
-            "Selecciona un usuario para ver sus clientes." if usuario is None else
-            "No hay clientes asignados. Usa Asignar clientes para agregarlos."
+            (
+                "No hay clientes registrados."
+                if rol == "recepcionista" else
+                "Selecciona un usuario para ver sus clientes."
+                if usuario is None else
+                "No hay clientes asignados. Usa Asignar clientes para agregarlos."
+            )
         )
         self.lblSinAsignados.setVisible(not clientes)
 
     def asignarClientesRol(self):
         usuario = self.usuarioRolSeleccionado()
-        if usuario is None:
+        if usuario is None or self.rolActual() == "recepcionista":
             return
         dialogo = QDialog(self)
         dialogo.setObjectName("asignarClientesRol")
@@ -971,6 +972,11 @@ class AdminWindow(QMainWindow):
 
     def cargarPrestamosCliente(self, cedula):
         self.tablaPrestamos.setRowCount(0)
+        if hasattr(self, "btnCreatePrestamo"):
+            self.btnCreatePrestamo.setEnabled(False)
+            self.btnCreatePrestamo.setToolTip(
+                "Selecciona un cliente para revisar sus préstamos."
+            )
         cliente = next(
             (cliente for cliente in self.clientes if cliente["cedula"] == cedula),
             None
@@ -987,6 +993,18 @@ class AdminWindow(QMainWindow):
                 f"No se pudieron cargar los prestamos: {error}"
             )
             return
+
+        tiene_pendiente = any(
+            prestamo["saldo_pendiente"] > 0
+            for prestamo in prestamos
+        )
+        if hasattr(self, "btnCreatePrestamo"):
+            self.btnCreatePrestamo.setEnabled(not tiene_pendiente)
+            self.btnCreatePrestamo.setToolTip(
+                "Debe liquidar su préstamo actual antes de crear otro."
+                if tiene_pendiente
+                else "Crear un préstamo para el cliente seleccionado."
+            )
 
         for prestamo in prestamos:
             fila = self.tablaPrestamos.rowCount()
@@ -1104,14 +1122,41 @@ class AdminWindow(QMainWindow):
                 background-color: white; color: #102848;
                 border: 1px solid #D9D2C2; border-radius: 8px;
                 padding: 10px; font-size: 14px;
-                selection-background-color: #F4EBD5; selection-color: #102848;
+                selection-background-color: #F4EBD5;
+                selection-color: #102848;
             }
-            QLineEdit:focus, QComboBox:focus { border-color: #C09848; }
+            QLineEdit:hover, QComboBox:hover { border-color: #A69D89; }
+            QLineEdit:focus, QComboBox:focus {
+                border-color: #C09848;
+            }
             QComboBox QAbstractItemView {
                 background-color: white; color: #102848;
-                selection-background-color: #F4EBD5; selection-color: #102848;
+                selection-background-color: #F4EBD5;
+                selection-color: #102848;
             }
-            QPushButton#guardarCambios:hover { background-color: #3F6B36; }
+            QPushButton {
+                background-color: #102848; color: white;
+                border: none; border-radius: 8px; padding: 10px;
+                font-size: 14px; font-weight: bold;
+            }
+            QPushButton:hover:enabled:!pressed {
+                background-color: #285580;
+            }
+            QPushButton:pressed:enabled {
+                background-color: #0B1C32;
+            }
+            QPushButton#cancelar_accion {
+                background-color: white; color: #33465F;
+                border: 1px solid #D9D2C2;
+            }
+            QPushButton#cancelar_accion:hover:enabled:!pressed {
+                background-color: #E8E3D7;
+                border-color: #A69D89;
+            }
+            QPushButton#guardarCambios:hover:enabled:!pressed {
+                background-color: #78B85B;
+                color: #102848;
+            }
         """)
         formulario = QFormLayout(dialogo)
         formulario.setContentsMargins(24, 24, 24, 24)
@@ -1149,7 +1194,7 @@ class AdminWindow(QMainWindow):
         password = QLineEdit()
         password.setObjectName("password")
         password.setEchoMode(QLineEdit.Password)
-        password.setMaxLength(128)
+        password.setMaxLength(12)
         password.setPlaceholderText("Dejar vacío para conservar la actual")
         formulario.addRow("Nueva contraseña:", password)
 
@@ -1224,7 +1269,7 @@ class AdminWindow(QMainWindow):
         password = QLineEdit()
         password.setObjectName("password")
         password.setEchoMode(QLineEdit.Password)
-        password.setMaxLength(128)
+        password.setMaxLength(12)
         password.setPlaceholderText("Dejar vacío para conservar la actual")
         if usuario_id is None:
             formulario.addRow("Seleccionar usuario:", selector)
@@ -1419,7 +1464,7 @@ class AdminWindow(QMainWindow):
         border-radius: 8px;
         padding: 10px 12px;
         font-size: 14px;
-        selection-background-color: #E6D3A5;
+        selection-background-color: #F4EBD5;
         selection-color: #102848;
     }
 
@@ -1432,20 +1477,20 @@ class AdminWindow(QMainWindow):
     }
 
     QPushButton#btnEnviar {
-        background-color: #183A60;
+        background-color: #102848;
         color: white;
         border: none;
         border-radius: 8px;
-        padding: 12px;
+        padding: 10px;
         font-size: 14px;
         font-weight: bold;
     }
 
-    QPushButton#btnEnviar:hover {
-        background-color: #0B1C32;
+    QPushButton#btnEnviar:hover:enabled:!pressed {
+        background-color: #285580;
     }
 
-    QPushButton#btnEnviar:pressed {
+    QPushButton#btnEnviar:pressed:enabled {
         background-color: #0B1C32;
     }
 """)
@@ -1475,7 +1520,7 @@ class AdminWindow(QMainWindow):
             "Ingresa tu contraseña..."
         )
         self.infoPassword.setEchoMode(QLineEdit.Password)
-        self.infoPassword.setMaxLength(128)
+        self.infoPassword.setMaxLength(12)
 
         self.infoDir = QLineEdit("")
         self.infoDir.setPlaceholderText(
@@ -1628,7 +1673,7 @@ class AdminWindow(QMainWindow):
         border-radius: 8px;
         padding: 10px 12px;
         font-size: 14px;
-        selection-background-color: #E6D3A5;
+        selection-background-color: #F4EBD5;
         selection-color: #102848;
     }
 
@@ -1641,20 +1686,20 @@ class AdminWindow(QMainWindow):
     }
 
     QPushButton#btnEnviar {
-        background-color: #183A60;
+        background-color: #102848;
         color: white;
         border: none;
         border-radius: 8px;
-        padding: 12px;
+        padding: 10px;
         font-size: 14px;
         font-weight: bold;
     }
 
-    QPushButton#btnEnviar:hover {
-        background-color: #0B1C32;
+    QPushButton#btnEnviar:hover:enabled:!pressed {
+        background-color: #285580;
     }
 
-    QPushButton#btnEnviar:pressed {
+    QPushButton#btnEnviar:pressed:enabled {
         background-color: #0B1C32;
     }
 """)
@@ -1678,7 +1723,7 @@ class AdminWindow(QMainWindow):
             "Ingresa tu contraseña..."
         )
         self.infoPassword.setEchoMode(QLineEdit.Password)
-        self.infoPassword.setMaxLength(128)
+        self.infoPassword.setMaxLength(12)
 
         self.btnEnviar = QPushButton("Enviar")
         self.btnEnviar.setObjectName("btnEnviar")
@@ -2010,8 +2055,82 @@ class AdminWindow(QMainWindow):
             return
 
         dialogo = QDialog(self)
+        dialogo.setObjectName("editarPrestamo")
         dialogo.setWindowTitle("Editar prestamo")
         dialogo.setModal(True)
+        dialogo.setStyleSheet("""
+            QDialog#editarPrestamo {
+                background-color: #FBFAF6;
+                color: #102848;
+            }
+
+            QDialog#editarPrestamo QLabel {
+                color: #33465F;
+                font-size: 14px;
+            }
+
+            QDialog#editarPrestamo QDoubleSpinBox,
+            QDialog#editarPrestamo QSpinBox,
+            QDialog#editarPrestamo QComboBox {
+                background-color: white;
+                color: #102848;
+                border: 1px solid #D9D2C2;
+                border-radius: 8px;
+                padding: 9px 10px;
+                font-size: 14px;
+                selection-background-color: #F4EBD5;
+                selection-color: #102848;
+            }
+
+            QDialog#editarPrestamo QDoubleSpinBox:hover,
+            QDialog#editarPrestamo QSpinBox:hover,
+            QDialog#editarPrestamo QComboBox:hover {
+                border-color: #A69D89;
+            }
+
+            QDialog#editarPrestamo QDoubleSpinBox:focus,
+            QDialog#editarPrestamo QSpinBox:focus,
+            QDialog#editarPrestamo QComboBox:focus {
+                border: 1px solid #C09848;
+            }
+
+            QDialog#editarPrestamo QComboBox QAbstractItemView {
+                background-color: white;
+                color: #102848;
+                selection-background-color: #F4EBD5;
+                selection-color: #102848;
+            }
+
+            QDialog#editarPrestamo QDialogButtonBox QPushButton {
+                min-width: 100px;
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+
+            QDialog#editarPrestamo QPushButton#btnGuardarEdicion {
+                background-color: #102848;
+                color: white;
+                border: 1px solid #102848;
+            }
+
+            QDialog#editarPrestamo QPushButton#btnGuardarEdicion:hover {
+                background-color: #183A60;
+                border-color: #183A60;
+            }
+
+            QDialog#editarPrestamo QPushButton#btnCancelarEdicion {
+                background-color: white;
+                color: #33465F;
+                border: 1px solid #D9D2C2;
+            }
+
+            QDialog#editarPrestamo QPushButton#btnCancelarEdicion:hover {
+                background-color: #F4F2EC;
+                border-color: #A69D89;
+            }
+        """)
 
         formulario = QFormLayout(dialogo)
         formulario.setObjectName("LayoutFEDIT")
@@ -2059,6 +2178,12 @@ class AdminWindow(QMainWindow):
         botones = QDialogButtonBox(
             QDialogButtonBox.Save | QDialogButtonBox.Cancel
         )
+        guardar = botones.button(QDialogButtonBox.Save)
+        guardar.setObjectName("btnGuardarEdicion")
+        guardar.setText("Guardar cambios")
+        cancelar = botones.button(QDialogButtonBox.Cancel)
+        cancelar.setObjectName("btnCancelarEdicion")
+        cancelar.setText("Cancelar")
         botones.accepted.connect(dialogo.accept)
         botones.rejected.connect(dialogo.reject)
         formulario.addRow(botones)

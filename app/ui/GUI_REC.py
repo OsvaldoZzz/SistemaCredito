@@ -11,6 +11,7 @@ from app.datos.citas_crud import (
 from app.datos.prestamos_crud import listar_prestamos, listar_todos_los_prestamos
 from app.ui.pagos_ui import abrir_dialogo_abono
 from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
+from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
 from app.reportes.reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 from app.datos.solicitudes_crud import crear_solicitud_prestamo
 from app.logica.validaciones import validar_cliente_unico, validar_datos_cliente
@@ -242,11 +243,6 @@ class RecepWindow(QMainWindow):
                 font-weight: bold;
             }
 
-            QPushButton#btnAcciones {
-                background-color: #183A60;
-                border-color: #0B1C32;
-            }
-
             QPushButton#btnAcciones:pressed {
                 background-color: #0B1C32;
                 border-color: #0B1C32;
@@ -390,7 +386,7 @@ class RecepWindow(QMainWindow):
             QMessageBox QPushButton:hover {
                 background-color: #3F6B36;
             }
-        """)
+        """ + ESTILOS_BOTONES_PANEL)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -694,6 +690,10 @@ class RecepWindow(QMainWindow):
 
     def cargarPrestamosCliente(self, cliente):
         self.tablaPrestamos.setRowCount(0)
+        self.btnSoliPrestamo.setEnabled(False)
+        self.btnSoliPrestamo.setToolTip(
+            "Selecciona un cliente para revisar sus préstamos."
+        )
         if cliente.get("id") is None:
             return
 
@@ -712,6 +712,17 @@ class RecepWindow(QMainWindow):
                 f"No se pudieron cargar los prestamos: {error}"
             )
             return
+
+        tiene_pendiente = any(
+            prestamo["saldo_pendiente"] > 0
+            for prestamo in prestamos
+        )
+        self.btnSoliPrestamo.setEnabled(not tiene_pendiente)
+        self.btnSoliPrestamo.setToolTip(
+            "Debe liquidar su préstamo actual antes de solicitar otro."
+            if tiene_pendiente
+            else "Solicitar un préstamo para el cliente seleccionado."
+        )
 
         for prestamo in prestamos:
             fila = self.tablaPrestamos.rowCount()
@@ -864,7 +875,7 @@ class RecepWindow(QMainWindow):
         password = QLineEdit()
         password.setObjectName("password")
         password.setEchoMode(QLineEdit.Password)
-        password.setMaxLength(128)
+        password.setMaxLength(12)
         password.setPlaceholderText("Dejar vacío para conservar la actual")
         formulario.addRow("Nueva contraseña:", password)
 
@@ -1060,7 +1071,7 @@ class RecepWindow(QMainWindow):
             "Ingresa tu contraseña..."
         )
         self.infoPassword.setEchoMode(QLineEdit.Password)
-        self.infoPassword.setMaxLength(128)
+        self.infoPassword.setMaxLength(12)
 
         self.infoDir = QLineEdit("")
         self.infoDir.setPlaceholderText(
