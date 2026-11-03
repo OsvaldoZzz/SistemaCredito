@@ -1,5 +1,9 @@
 # Sistema de créditos
 
+La nueva versión **React + JavaScript** está en [`web/`](web/README.md), con
+interés del 15 % para préstamos nuevos y una copia independiente de MySQL.
+La aplicación Python conserva su código y su base original.
+
 Aplicación de escritorio con PySide6, MySQL y reportes PDF.
 
 ## Ejecutar
@@ -18,7 +22,13 @@ Las imágenes y los reportes usan rutas basadas en la ubicación del proyecto.
 Dependencias: `PySide6`, `mysql-connector-python` y `reportlab`.
 La conexión admite las variables `DB_HOST`, `DB_PORT`, `DB_USER`,
 `DB_PASSWORD` y `DB_NAME`, configuradas en el entorno antes de iniciar.
-La base de datos debe disponer de las tablas `clientes` y `prestamo`.
+La base de datos debe disponer de las tablas `clientes`, `prestamo` y
+`usuarios` (con las columnas `id`, `rol`, `nombre` y `password`). El login
+carga de `usuarios` las cuentas del personal; desde Administración, el botón
+**Actualizar datos** de cobradores y recepcionistas guarda el nombre y la
+contraseña modificados en MySQL. La tabla `cobrador_clientes`, que relaciona
+cobradores con clientes, se crea automáticamente al cargar usuarios; MySQL
+necesita permiso `CREATE` la primera vez.
 
 ## Mapa de clientes
 

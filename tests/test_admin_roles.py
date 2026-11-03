@@ -7,7 +7,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QTableWidgetItem, QWidget
+from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QTableWidgetItem, QWidget
 from app.ui.GUI_ADMIN import AdminWindow
 from app.ui import pagos_ui
 
@@ -161,6 +161,19 @@ class AdminRolesTest(unittest.TestCase):
             self.window.accionesAdmin()
             crear.assert_not_called()
 
+    def test_boton_actualizar_datos_edita_al_usuario_seleccionado(self):
+        for indice, rol, usuario_id in (
+            (1, "cobrador", "4"),
+            (2, "recepcionista", "3"),
+        ):
+            with self.subTest(rol=rol):
+                self.window.tabs.setCurrentIndex(indice)
+                lista = self.window.listaCobradores if rol == "cobrador" else self.window.listaRecep
+                lista.setCurrentRow(lista.count() - 1)
+                with patch.object(self.window, "actualizarRol") as actualizar:
+                    self.window.btnActualizarRol.click()
+                actualizar.assert_called_once_with(rol, usuario_id)
+
     def test_creacion_fija_el_rol_y_actualiza_lista(self):
         self.window.crearRol("recepcionista")
         self.assertEqual(self.window.infoRol.currentText(), "recepcionista")
@@ -193,8 +206,11 @@ class AdminRolesTest(unittest.TestCase):
             guardar.click()
             return dialogo.result()
 
-        with patch.object(QDialog, "exec", editar), patch.object(QMessageBox, "information"):
+        with patch.object(QDialog, "exec", editar), \
+             patch.object(QMessageBox, "information"), \
+             patch("app.ui.GUI_ADMIN.actualizar_usuario", return_value=True) as guardar_usuario:
             self.window.actualizarRol("recepcionista", "3")
+        guardar_usuario.assert_called_once_with(3, "Yavar Smith", "recepcionista", None)
         self.assertEqual(self.login.usuarios[2]["password"], "87654321")
         self.assertEqual(self.window.lblNombreRol.text(), "Usuario: Yavar Smith")
         self.assertEqual(self.login.usuarios[2]["usuario"], "Yavar Smith")
@@ -258,10 +274,15 @@ class AdminRolesTest(unittest.TestCase):
             self.assertEqual(lista.count(), 3)
             lista.item(0).setCheckState(Qt.CheckState.Checked)
             lista.item(1).setCheckState(Qt.CheckState.Checked)
-            return QDialog.Accepted
+            dialogo.findChild(QDialogButtonBox).button(
+                QDialogButtonBox.Save
+            ).click()
+            return dialogo.result()
 
-        with patch.object(QDialog, "exec", asignar):
+        with patch.object(QDialog, "exec", asignar), \
+             patch("app.ui.GUI_ADMIN.guardar_asignaciones_cobrador", return_value=True) as guardar:
             self.window.asignarClientesRol()
+        guardar.assert_called_once_with(4, [11, 12])
         tabla = self.window.tablaClientesRol
         self.assertEqual(tabla.rowCount(), 2)
         self.assertEqual(self.window.lblTotalAsignados.text(), "Clientes asignados: 2")
@@ -284,14 +305,49 @@ class AdminRolesTest(unittest.TestCase):
             lista.item(0).setCheckState(Qt.CheckState.Unchecked)
             return resultado
 
-        with patch.object(QDialog, "exec", lambda d: cambiar(d, QDialog.Rejected)):
+        with patch.object(QDialog, "exec", lambda d: cambiar(d, QDialog.Rejected)), \
+             patch("app.ui.GUI_ADMIN.guardar_asignaciones_cobrador") as guardar:
             self.window.asignarClientesRol()
+            guardar.assert_not_called()
         self.assertEqual(self.window.tablaClientesRol.rowCount(), 2)
-        with patch.object(QDialog, "exec", lambda d: cambiar(d, QDialog.Accepted)):
+
+        def guardar_cambio(dialogo):
+            cambiar(dialogo, None)
+            dialogo.findChild(QDialogButtonBox).button(
+                QDialogButtonBox.Save
+            ).click()
+            return dialogo.result()
+
+        with patch.object(QDialog, "exec", guardar_cambio), \
+             patch("app.ui.GUI_ADMIN.guardar_asignaciones_cobrador", return_value=True) as guardar:
             self.window.asignarClientesRol()
+        guardar.assert_called_once_with(4, [12])
         self.assertEqual(self.login.usuarios[3]["clientes_asignados"], ["id:12"])
         self.assertEqual(self.window.tablaClientesRol.rowCount(), 1)
         self.assertEqual(len(self.window.clientes), 3)
+
+    def test_error_al_guardar_asignacion_no_actualiza_interfaz(self):
+        self.preparar_clientes()
+        self.login.usuarios[3]["clientes_asignados"] = ["id:11"]
+        self.window.tabs.setCurrentIndex(1)
+
+        def guardar(dialogo):
+            lista = dialogo.findChild(QListWidget, "clientesAsignables")
+            lista.item(0).setCheckState(Qt.CheckState.Unchecked)
+            lista.item(1).setCheckState(Qt.CheckState.Checked)
+            dialogo.findChild(QDialogButtonBox).button(
+                QDialogButtonBox.Save
+            ).click()
+            return dialogo.result()
+
+        with patch.object(QDialog, "exec", guardar), \
+             patch("app.ui.GUI_ADMIN.guardar_asignaciones_cobrador", side_effect=OSError("DB no disponible")), \
+             patch.object(QMessageBox, "critical") as error:
+            self.window.asignarClientesRol()
+
+        self.assertEqual(self.login.usuarios[3]["clientes_asignados"], ["id:11"])
+        self.assertEqual(self.window.tablaClientesRol.rowCount(), 1)
+        error.assert_called_once()
 
     def test_asignaciones_reflejan_edicion_y_clientes_eliminados(self):
         self.preparar_clientes()

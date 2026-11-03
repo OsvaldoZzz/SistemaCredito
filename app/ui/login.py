@@ -14,6 +14,7 @@ from app.ui.GUI_REC import RecepWindow
 from app.ui.GUI_CLIENTE import ClienteWindow
 from app.ui.GUI_COB import CobWindow
 from app.datos.clientes_crud import listar_clientes
+from app.datos.usuarios_crud import listar_usuarios
 from app.logica.validaciones import validar_campos_login
 
 
@@ -21,17 +22,15 @@ class login(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setUpUi()
-        self.usuarios = [
-            {"id":"1001","rol": "administrador","usuario": "Marvin" , "password": "12345678"},
-            {"id":"1002","rol": "administrador","usuario": "Yavar", "password": "84635922"},
-            {"id":"1003","rol": "administrador","usuario": "Celia", "password": "87253629"},
-            {"id":"1004","rol": "administrador","usuario": "Ariel", "password": "89268598"},
-            {"id":"1005","rol": "recepcionista","usuario": "recepcionista1", "password": "12345678"},
-            
-            {"id":"1006","rol": "recepcionista","usuario": "recepcionista2", "password": "12345678"},
-            {"id":"1007","rol": "cobrador","usuario": "cobrador1", "password": "12345678"},
-            {"id":"1008","rol": "cobrador","usuario": "cobrador2", "password": "12345678"},
-        ]
+        try:
+            self.usuarios = listar_usuarios()
+        except Exception as error:
+            self.usuarios = []
+            QMessageBox.warning(
+                self,
+                "Base de datos no disponible",
+                f"No se pudieron cargar los usuarios: {error}"
+            )
 
         self.clientes = []
 

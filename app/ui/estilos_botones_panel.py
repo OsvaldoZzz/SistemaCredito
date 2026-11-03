@@ -58,21 +58,24 @@ ESTILOS_BOTONES_PANEL = """
 
     QPushButton#actualizar_clientes:enabled,
     QPushButton#abonar_prestamo:enabled,
-    QPushButton#actualizar_roles:enabled {
+    QPushButton#actualizar_roles:enabled,
+    QPushButton#actualizar_datos_rol:enabled {
         background-color: #E8BD45;
         color: #102848;
     }
 
     QPushButton#actualizar_clientes:hover:enabled:!pressed,
     QPushButton#abonar_prestamo:hover:enabled:!pressed,
-    QPushButton#actualizar_roles:hover:enabled:!pressed {
+    QPushButton#actualizar_roles:hover:enabled:!pressed,
+    QPushButton#actualizar_datos_rol:hover:enabled:!pressed {
         background-color: #D8AC34;
         color: #102848;
     }
 
     QPushButton#actualizar_clientes:pressed:enabled,
     QPushButton#abonar_prestamo:pressed:enabled,
-    QPushButton#actualizar_roles:pressed:enabled {
+    QPushButton#actualizar_roles:pressed:enabled,
+    QPushButton#actualizar_datos_rol:pressed:enabled {
         background-color: #C99A28;
         color: #102848;
     }

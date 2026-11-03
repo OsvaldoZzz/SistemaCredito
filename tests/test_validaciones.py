@@ -313,6 +313,9 @@ class FormulariosTest(unittest.TestCase):
         from PySide6.QtWidgets import QMessageBox
         from app.ui import login as login_module, GUI_ADMIN as admin
         with patch.object(login_module, "listar_clientes", return_value=[]), \
+             patch.object(login_module, "listar_usuarios", return_value=[
+                 dict(id="1", rol="administrador", usuario="Marvin", password="12345678")
+             ]), \
              patch.object(admin.AdminWindow, "showMaximized"), \
              patch.object(QMessageBox, "information"), patch.object(QMessageBox, "warning") as aviso:
             login = login_module.login()
@@ -349,6 +352,9 @@ class FormulariosTest(unittest.TestCase):
         from PySide6.QtWidgets import QMessageBox
         from app.ui import login as login_module
         with patch.object(login_module, "listar_clientes", return_value=[]), \
+             patch.object(login_module, "listar_usuarios", return_value=[
+                 dict(id="1", rol="administrador", usuario="Marvin", password="12345678")
+             ]), \
              patch.object(QMessageBox, "warning"), patch.object(QMessageBox, "critical"):
             login = login_module.login()
             try:

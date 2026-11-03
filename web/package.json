@@ -1,0 +1,37 @@
+{
+  "name": "sistcreditos-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:client": "vite --config frontend/vite.config.js",
+    "dev:server": "node --env-file-if-exists=.env --watch backend/server.js",
+    "build": "vite build --config frontend/vite.config.js",
+    "build:netlify": "node scripts/build-netlify.js",
+    "start": "node --env-file-if-exists=.env backend/server.js",
+    "db:prepare": "node --env-file-if-exists=.env backend/prepare.js",
+    "db:copy": "node --env-file-if-exists=.env backend/copy-database.js",
+    "test": "node --test backend/tests/domain.test.js backend/tests/deployment.test.js",
+    "test:integration": "node --env-file-if-exists=.env --test backend/tests/integration.test.js",
+    "pretest:browser": "npm run build",
+    "test:browser": "node --env-file-if-exists=.env scripts/browser-test.js"
+  },
+  "dependencies": {
+    "decimal.js": "^10.5.0",
+    "express": "^5.1.0",
+    "leaflet": "^1.9.4",
+    "mysql2": "^3.14.0",
+    "pdfkit": "^0.17.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@vitejs/plugin-react": "^4.4.0",
+    "vite": "^6.3.0"
+  }
+}

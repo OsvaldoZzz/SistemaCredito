@@ -9,6 +9,10 @@ from PySide6.QtWidgets import QHeaderView
 from mysql.connector import Error as MySQLConnectorError
 from app.reportes.reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 from app.datos.clientes_crud import actualizar_cliente, crear_cliente, eliminar_cliente, listar_clientes
+from app.datos.usuarios_crud import (
+    actualizar_usuario,
+    guardar_asignaciones_cobrador,
+)
 from app.datos.prestamos_crud import (
     actualizar_prestamo,
     crear_prestamo,
@@ -102,7 +106,8 @@ class AdminWindow(QMainWindow):
             }
 
             QPushButton#actualizar_clientes:hover,
-            QPushButton#actualizar_roles:hover {
+            QPushButton#actualizar_roles:hover,
+            QPushButton#actualizar_datos_rol:hover {
                 background-color: #3F6B36;
             }
 
@@ -811,8 +816,12 @@ class AdminWindow(QMainWindow):
         self.btnAsignarClientes = QPushButton("Asignar clientes")
         self.btnAsignarClientes.setObjectName("asignar_clientes")
         self.btnAsignarClientes.clicked.connect(self.asignarClientesRol)
+        self.btnActualizarRol = QPushButton("Actualizar datos")
+        self.btnActualizarRol.setObjectName("actualizar_datos_rol")
+        self.btnActualizarRol.clicked.connect(self.actualizarRolSeleccionado)
         encabezadoClientes.addWidget(self.lblTotalAsignados)
         encabezadoClientes.addStretch()
+        encabezadoClientes.addWidget(self.btnActualizarRol)
         encabezadoClientes.addWidget(self.btnAsignarClientes)
         contenido.addLayout(encabezadoClientes)
 
@@ -843,7 +852,14 @@ class AdminWindow(QMainWindow):
         self.lblIdRol.setText(f"ID: {usuario['id']}" if usuario else "")
         self.lblTipoRol.setVisible(usuario is not None)
         self.lblIdRol.setVisible(usuario is not None)
+        self.btnActualizarRol.setVisible(usuario is not None)
+        self.btnActualizarRol.setEnabled(usuario is not None)
         self.mostrarClientesRol(usuario)
+
+    def actualizarRolSeleccionado(self):
+        usuario = self.usuarioRolSeleccionado()
+        if usuario is not None:
+            self.actualizarRol(self.rolActual(), usuario["id"])
 
     def claveClienteAsignado(self, cliente):
         if cliente.get("id") is not None:
@@ -924,16 +940,52 @@ class AdminWindow(QMainWindow):
         botones = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         botones.button(QDialogButtonBox.Save).setText("Guardar asignación")
         botones.button(QDialogButtonBox.Cancel).setText("Cancelar")
-        botones.accepted.connect(dialogo.accept)
-        botones.rejected.connect(dialogo.reject)
-        layout.addWidget(botones)
-        if dialogo.exec() == QDialog.Accepted:
-            usuario["clientes_asignados"] = [
+
+        def guardar_asignaciones():
+            claves = [
                 lista.item(fila).data(Qt.ItemDataRole.UserRole)
                 for fila in range(lista.count())
                 if lista.item(fila).checkState() == Qt.CheckState.Checked
             ]
+            if any(not clave.startswith("id:") for clave in claves):
+                QMessageBox.warning(
+                    dialogo,
+                    "Cliente no guardable",
+                    "Solo se pueden asignar clientes que ya estén guardados en la base de datos.",
+                )
+                return
+            cliente_ids = [int(clave.removeprefix("id:")) for clave in claves]
+            try:
+                guardado = guardar_asignaciones_cobrador(
+                    int(usuario["id"]),
+                    cliente_ids,
+                )
+            except ValueError as error:
+                QMessageBox.warning(dialogo, "Asignación inválida", str(error))
+                return
+            except (MySQLConnectorError, OSError) as error:
+                QMessageBox.critical(
+                    dialogo,
+                    "Error al guardar asignación",
+                    f"No se pudieron guardar los clientes asignados: {error}",
+                )
+                return
+            if not guardado:
+                QMessageBox.critical(
+                    dialogo,
+                    "Error al guardar asignación",
+                    "No se pudieron guardar los clientes asignados.",
+                )
+                return
+
+            usuario["clientes_asignados"] = claves
             self.mostrarRol()
+            dialogo.accept()
+
+        botones.accepted.connect(guardar_asignaciones)
+        botones.rejected.connect(dialogo.reject)
+        layout.addWidget(botones)
+        dialogo.exec()
 
     def actualizarListasRoles(self):
         for rol, lista in (
@@ -1334,16 +1386,45 @@ class AdminWindow(QMainWindow):
             if error:
                 QMessageBox.warning(dialogo, "Datos inválidos", error)
                 return
+            try:
+                actualizado = actualizar_usuario(
+                    int(usuario["id"]),
+                    nuevo_nombre,
+                    nuevo_rol,
+                    nueva_password or None,
+                )
+            except ValueError as error:
+                QMessageBox.warning(dialogo, "Datos inválidos", str(error))
+                return
+            except MySQLConnectorError as error:
+                QMessageBox.critical(
+                    dialogo,
+                    "Error al actualizar usuario",
+                    f"No se pudieron guardar los cambios: {error}",
+                )
+                return
+            if not actualizado:
+                QMessageBox.warning(
+                    dialogo,
+                    "Usuario no encontrado",
+                    "El usuario ya no existe en la base de datos.",
+                )
+                return
+
             usuario.update(usuario=nuevo_nombre, rol=nuevo_rol)
-            self.actualizarListasRoles()
             if nueva_password:
                 usuario["password"] = nueva_password
+            self.actualizarListasRoles()
             if es_actual:
                 self.usuario = nuevo_nombre
                 self.ventana_login.input_user.setText(nuevo_nombre)
                 self.findChild(QLabel, "infoUsuario").setText(nuevo_nombre)
             dialogo.accept()
-            QMessageBox.information(self, "Rol actualizado", "Los cambios están disponibles durante esta sesión.")
+            QMessageBox.information(
+                self,
+                "Usuario actualizado",
+                "Los cambios se guardaron en la base de datos.",
+            )
 
         selector.currentIndexChanged.connect(cargar)
         cargar()
