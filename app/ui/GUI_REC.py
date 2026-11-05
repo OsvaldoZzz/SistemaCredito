@@ -13,6 +13,7 @@ from app.datos.prestamos_crud import listar_prestamos, listar_todos_los_prestamo
 from app.ui.pagos_ui import abrir_dialogo_abono
 from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
 from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
+from app.ui.tabla_ui import centrar_tabla
 from app.reportes.reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 from app.datos.solicitudes_crud import crear_solicitud_prestamo
 from app.logica.validaciones import validar_cliente_unico, validar_datos_cliente
@@ -515,6 +516,7 @@ class RecepWindow(QMainWindow):
         # =====================================================
 
         self.tablaPrestamos = QTableWidget()
+        centrar_tabla(self.tablaPrestamos)
 
         self.tablaPrestamos.setColumnCount(7)
         self.tablaPrestamos.setEditTriggers(
@@ -1552,6 +1554,7 @@ class RecepWindow(QMainWindow):
         dialogo.resize(720, 420)
         layout = QVBoxLayout(dialogo)
         tabla = QTableWidget(len(citas), 5)
+        centrar_tabla(tabla)
         tabla.setHorizontalHeaderLabels(
             ["ID", "Cliente", "Cédula", "Fecha", "Estado"]
         )

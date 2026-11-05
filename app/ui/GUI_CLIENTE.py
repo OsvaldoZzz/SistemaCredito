@@ -8,6 +8,7 @@ from app.datos.citas_crud import crear_cita
 from app.datos.prestamos_crud import listar_prestamos
 from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
 from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
+from app.ui.tabla_ui import centrar_tabla
 
 
 class ClienteWindow(QMainWindow):
@@ -51,6 +52,11 @@ class ClienteWindow(QMainWindow):
             /* FRAME PRINCIPAL */
 
             QFrame#frameCliente {
+                background-color: transparent;
+                border: none;
+            }
+
+            QWidget#panelInfoCliente {
                 background-color: white;
                 border: 1px solid #DDD8CB;
                 border-radius: 10px;
@@ -267,8 +273,14 @@ class ClienteWindow(QMainWindow):
 
         # INFORMACION DEL CLIENTE
 
+        panelInfo = QWidget()
+        panelInfo.setObjectName("panelInfoCliente")
+        layoutInfo = QVBoxLayout(panelInfo)
+        layoutInfo.setContentsMargins(14, 12, 14, 12)
+        layoutInfo.setSpacing(8)
+
         titulo = QLabel("Información del cliente")
-        layoutFrame.addWidget(titulo)
+        layoutInfo.addWidget(titulo)
 
         self.lblNombre = QLabel(
             f"Nombre: {self.cliente['nombre']}"
@@ -280,12 +292,13 @@ class ClienteWindow(QMainWindow):
         )
         self.lblCorreo.setObjectName("lblCorreo")
 
-        layoutFrame.addWidget(self.lblNombre)
-        layoutFrame.addWidget(self.lblCorreo)
+        layoutInfo.addWidget(self.lblNombre)
+        layoutInfo.addWidget(self.lblCorreo)
         self.lblDireccion = QLabel(f"Dirección: {self.cliente.get('direccion') or '-'}")
         self.lblDireccion.setTextFormat(Qt.TextFormat.PlainText)
         self.lblDireccion.setWordWrap(True)
-        layoutFrame.addWidget(self.lblDireccion)
+        layoutInfo.addWidget(self.lblDireccion)
+        layoutFrame.addWidget(panelInfo)
 
         # PRESTAMO
 
@@ -299,6 +312,7 @@ class ClienteWindow(QMainWindow):
         # =====================================================
 
         self.tablaPrestamos = QTableWidget()
+        centrar_tabla(self.tablaPrestamos)
         self.tablaPrestamos.setObjectName("tablaPrestamos")
         self.tablaPrestamos.setWordWrap(False)
 

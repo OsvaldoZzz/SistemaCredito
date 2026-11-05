@@ -23,6 +23,7 @@ from app.datos.prestamos_crud import (
 from app.ui.pagos_ui import abrir_dialogo_abono
 from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
 from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
+from app.ui.tabla_ui import centrar_tabla
 from app.datos.solicitudes_crud import (
     listar_solicitudes_pendientes,
     resolver_solicitud_prestamo,
@@ -667,6 +668,7 @@ class AdminWindow(QMainWindow):
 #===========================
         
         self.tablaPrestamos = QTableWidget()
+        centrar_tabla(self.tablaPrestamos)
 
         self.tablaPrestamos.setColumnCount(7)
         self.tablaPrestamos.setRowCount(0)
@@ -826,6 +828,7 @@ class AdminWindow(QMainWindow):
         contenido.addLayout(encabezadoClientes)
 
         self.tablaClientesRol = QTableWidget(0, 4)
+        centrar_tabla(self.tablaClientesRol)
         self.tablaClientesRol.setObjectName("tablaClientesRol")
         self.tablaClientesRol.setHorizontalHeaderLabels(["Nombre", "Cédula", "Correo", "Dirección"])
         self.tablaClientesRol.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -2690,6 +2693,7 @@ class AdminWindow(QMainWindow):
         """)
         layout = QVBoxLayout(dialogo)
         tabla = QTableWidget(len(solicitudes), 10)
+        centrar_tabla(tabla)
         tabla.setObjectName("tablaSolicitudes")
         tabla.setAlternatingRowColors(True)
         tabla.setHorizontalHeaderLabels(

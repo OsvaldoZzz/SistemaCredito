@@ -11,6 +11,7 @@ from app.datos.prestamos_crud import listar_prestamos, listar_todos_los_prestamo
 from app.ui.pagos_ui import abrir_dialogo_abono
 from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
 from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
+from app.ui.tabla_ui import centrar_tabla
 from app.reportes.reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 from app.logica.validaciones import validar_cliente_unico, validar_datos_cliente
 from app.logica.calculos_prestamo import (
@@ -442,6 +443,7 @@ class CobWindow(QMainWindow):
         # =====================================================
 
         self.tablaPrestamos = QTableWidget()
+        centrar_tabla(self.tablaPrestamos)
 
         self.tablaPrestamos.setColumnCount(7)
         self.tablaPrestamos.setEditTriggers(

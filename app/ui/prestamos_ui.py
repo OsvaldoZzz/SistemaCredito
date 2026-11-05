@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt
 
 from app.logica.calculos_prestamo import PORCENTAJE_INTERES
 from app.datos.prestamos_crud import listar_cuotas_prestamo
+from app.ui.tabla_ui import centrar_tabla
 
 
 def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
@@ -35,6 +36,7 @@ def mostrar_detalle_prestamo(parent, prestamo_id: int) -> None:
     layout.addWidget(encabezado)
 
     tabla = QTableWidget(len(cuotas), 13)
+    centrar_tabla(tabla)
     tabla.setHorizontalHeaderLabels([
         "Cuota",
         "Vencimiento",
