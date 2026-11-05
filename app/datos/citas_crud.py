@@ -4,12 +4,12 @@ from sqlalchemy import select
 
 from app.config.conexion import obtener_sesion
 from app.datos.modelos import Cita, Cliente
-from app.logica.validaciones import validar_fecha, validar_id
+from app.logica.validaciones import validar_fecha_cita, validar_id
 
 
 def crear_cita(cliente_id: int, fecha: date) -> int:
     validar_id(cliente_id)
-    validar_fecha(fecha)
+    validar_fecha_cita(fecha)
 
     with obtener_sesion() as session, session.begin():
         existente = session.scalar(

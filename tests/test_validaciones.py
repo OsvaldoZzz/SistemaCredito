@@ -224,9 +224,30 @@ class ValidacionesTest(OrmTestCase):
 
     def test_cita_duplicada_no_se_guarda(self):
         self._crear_cliente()
-        citas_crud.crear_cita(1, date.today())
+        fecha = date.today()
+        if fecha.weekday() == 6:
+            fecha += timedelta(days=1)
+        citas_crud.crear_cita(1, fecha)
         with self.assertRaisesRegex(ValueError, "Ya tienes una cita"):
-            citas_crud.crear_cita(1, date.today())
+            citas_crud.crear_cita(1, fecha)
+
+    def test_cita_en_domingo_no_abre_sesion(self):
+        hoy = date.today()
+        domingo = hoy + timedelta(days=(6 - hoy.weekday()) % 7)
+        with patch.object(citas_crud, "obtener_sesion") as obtener:
+            with self.assertRaisesRegex(ValueError, "domingos"):
+                citas_crud.crear_cita(1, domingo)
+            obtener.assert_not_called()
+
+    def test_citas_de_lunes_a_sabado_se_guardan(self):
+        self._crear_cliente()
+        hoy = date.today()
+        lunes = hoy + timedelta(days=(7 - hoy.weekday()) % 7)
+        for dias in range(6):
+            fecha = lunes + timedelta(days=dias)
+            with self.subTest(fecha=fecha):
+                self.assertIsInstance(citas_crud.crear_cita(1, fecha), int)
+        self.assertEqual(len(citas_crud.listar_citas(1)), 6)
 
     def test_abono_superior_al_saldo_se_rechaza(self):
         self._crear_cliente()
@@ -240,6 +261,33 @@ class FormulariosTest(unittest.TestCase):
     def setUpClass(cls):
         from PySide6.QtWidgets import QApplication
         cls.app = QApplication.instance() or QApplication([])
+
+    def test_agendar_cita_bloquea_domingo_y_permite_cambiar_fecha(self):
+        from PySide6.QtCore import QDate
+        from PySide6.QtWidgets import QDateEdit, QDialog, QMainWindow, QPushButton
+        from app.ui import GUI_CLIENTE
+
+        def revisar_dialogo(dialogo):
+            fecha = dialogo.findChild(QDateEdit)
+            confirmar = dialogo.findChild(QPushButton, "confirmarCita")
+            hoy = QDate.currentDate()
+            domingo = hoy.addDays((7 - hoy.dayOfWeek()) % 7)
+            fecha.setDate(domingo)
+            self.assertFalse(confirmar.isEnabled())
+            confirmar.click()
+            self.assertEqual(dialogo.result(), QDialog.Rejected)
+            fecha.setDate(domingo.addDays(1))
+            self.assertTrue(confirmar.isEnabled())
+            return QDialog.Rejected
+
+        ventana = QMainWindow()
+        try:
+            with patch.object(QDialog, "exec", new=revisar_dialogo), \
+                 patch.object(GUI_CLIENTE, "crear_cita") as crear:
+                GUI_CLIENTE.ClienteWindow.abrirDialogoAgendarCita(ventana)
+                crear.assert_not_called()
+        finally:
+            ventana.close()
 
     def test_formularios_cliente_en_los_tres_paneles(self):
         from types import SimpleNamespace

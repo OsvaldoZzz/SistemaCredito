@@ -6,6 +6,7 @@ from datetime import date
 from app.config.errores_db import ERRORES_BASE_DATOS
 from app.datos.citas_crud import crear_cita
 from app.datos.prestamos_crud import listar_prestamos
+from app.logica.validaciones import validar_fecha_cita
 from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
 from app.ui.prestamos_ui import mostrar_detalle_prestamo, mostrar_error_detalle_prestamo
 from app.ui.tabla_ui import centrar_tabla
@@ -376,21 +377,118 @@ class ClienteWindow(QMainWindow):
 
     def abrirDialogoAgendarCita(self):
         dialogo = QDialog(self)
+        dialogo.setObjectName("agendarCita")
         dialogo.setWindowTitle("Agendar cita")
-        dialogo.resize(360, 140)
+        dialogo.setMinimumWidth(400)
+        dialogo.setStyleSheet("""
+            QDialog#agendarCita {
+                background-color: #FBFAF6;
+                color: #102848;
+            }
+
+            QDialog#agendarCita QLabel {
+                color: #33465F;
+                font-size: 14px;
+                font-weight: normal;
+            }
+
+            QDialog#agendarCita QDateEdit {
+                background-color: white;
+                color: #102848;
+                border: 1px solid #D9D2C2;
+                border-radius: 8px;
+                padding: 9px 10px;
+                font-size: 14px;
+                selection-background-color: #E6D3A5;
+                selection-color: #102848;
+            }
+
+            QDialog#agendarCita QDateEdit:hover {
+                border-color: #A69D89;
+            }
+
+            QDialog#agendarCita QDateEdit:focus {
+                border-color: #C09848;
+            }
+
+            QDialog#agendarCita QPushButton {
+                min-width: 110px;
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+
+            QDialog#agendarCita QPushButton#confirmarCita {
+                background-color: #183A60;
+                color: white;
+                border: 1px solid #183A60;
+            }
+
+            QDialog#agendarCita QPushButton#confirmarCita:hover {
+                background-color: #0B1C32;
+                border-color: #0B1C32;
+            }
+
+            QDialog#agendarCita QPushButton#confirmarCita:disabled {
+                background-color: #D9D2C2;
+                border-color: #D9D2C2;
+                color: #65758B;
+            }
+
+            QDialog#agendarCita QPushButton#cancelarCita {
+                background-color: white;
+                color: #33465F;
+                border: 1px solid #D9D2C2;
+            }
+
+            QDialog#agendarCita QPushButton#cancelarCita:hover {
+                background-color: #F4F1E8;
+                border-color: #A69D89;
+            }
+        """)
 
         formLayoutAC = QFormLayout(dialogo)
+        formLayoutAC.setContentsMargins(24, 24, 24, 24)
+        formLayoutAC.setSpacing(16)
+        formLayoutAC.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         fecha_edit = QDateEdit()
         fecha_edit.setCalendarPopup(True)
         fecha_edit.setDate(QDate.currentDate())
         fecha_edit.setMinimumDate(QDate.currentDate())
         fecha_edit.setDisplayFormat("dd/MM/yyyy")
         formLayoutAC.addRow("Fecha:", fecha_edit)
+        aviso_fecha = QLabel("No se pueden agendar citas los domingos. Selecciona otro día.")
+        aviso_fecha.setWordWrap(True)
+        formLayoutAC.addRow(aviso_fecha)
 
         botones = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         )
-        botones.accepted.connect(dialogo.accept)
+        confirmar = botones.button(QDialogButtonBox.Ok)
+        confirmar.setObjectName("confirmarCita")
+        confirmar.setText("Agendar cita")
+        cancelar = botones.button(QDialogButtonBox.Cancel)
+        cancelar.setObjectName("cancelarCita")
+        cancelar.setText("Cancelar")
+        for boton in (confirmar, cancelar):
+            boton.setCursor(Qt.CursorShape.PointingHandCursor)
+        def actualizar_fecha():
+            es_domingo = fecha_edit.date().dayOfWeek() == 7
+            confirmar.setEnabled(not es_domingo)
+            aviso_fecha.setVisible(es_domingo)
+
+        def confirmar_fecha():
+            try:
+                validar_fecha_cita(fecha_edit.date().toPython())
+            except ValueError as error:
+                QMessageBox.warning(dialogo, "Fecha no disponible", str(error))
+                return
+            dialogo.accept()
+
+        fecha_edit.dateChanged.connect(actualizar_fecha)
+        actualizar_fecha()
+        botones.accepted.connect(confirmar_fecha)
         botones.rejected.connect(dialogo.reject)
         formLayoutAC.addRow(botones)
 

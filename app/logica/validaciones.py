@@ -45,6 +45,12 @@ def validar_fecha(fecha: date, permitir_pasada=False) -> None:
         raise ValueError("La fecha no puede ser anterior a hoy.")
 
 
+def validar_fecha_cita(fecha: date) -> None:
+    validar_fecha(fecha)
+    if fecha.weekday() == 6:
+        raise ValueError("No se pueden agendar citas los domingos. Selecciona otro día.")
+
+
 def validar_password(password: str) -> str | None:
     if not isinstance(password, str) or not password.strip():
         return "Ingresa una contraseña."
