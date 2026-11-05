@@ -5,7 +5,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
-from mysql.connector import Error as MySQLConnectorError
+from app.config.errores_db import ERRORES_BASE_DATOS
 from app.datos.clientes_crud import crear_cliente, listar_clientes
 from app.datos.prestamos_crud import listar_prestamos, listar_todos_los_prestamos
 from app.ui.pagos_ui import abrir_dialogo_abono
@@ -522,7 +522,7 @@ class CobWindow(QMainWindow):
         cliente_id = cliente_actual.get("id") if cliente_actual else None
         try:
             clientes = listar_clientes()
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al actualizar",
@@ -654,7 +654,7 @@ class CobWindow(QMainWindow):
             return
         try:
             mostrar_detalle_prestamo(self, int(id_item.text()))
-        except (MySQLConnectorError, OSError, TypeError, ValueError) as error:
+        except ERRORES_BASE_DATOS + (OSError, TypeError, ValueError) as error:
             mostrar_error_detalle_prestamo(self, error)
 
     def buscarCliente(self):
@@ -718,7 +718,7 @@ class CobWindow(QMainWindow):
 
         try:
             registrado = abrir_dialogo_abono(self, int(id_item.text()))
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al registrar abono",

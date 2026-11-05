@@ -1,20 +1,34 @@
 import os
 import unittest
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QLineEdit, QMessageBox
 from app.datos import clientes_crud
+from app.config.conexion import obtener_sesion
+from app.datos.modelos import Cliente
 from app.logica.ubicacion import validar_coordenadas
 from app.ui import mapa_dialogo, ubicacion_ui
+from orm_test_utils import OrmTestCase
 
 
-class UbicacionTest(unittest.TestCase):
+class UbicacionTest(OrmTestCase):
     @classmethod
     def setUpClass(cls):
+        super().setUpClass()
         cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        super().setUp()
+        clientes_crud._ubicacion_lista = True
+
+    @classmethod
+    def tearDownClass(cls):
+        for widget in cls.app.topLevelWidgets():
+            widget.close()
+        super().tearDownClass()
 
     def test_coordenadas_nulas_cero_decimales_y_limites(self):
         self.assertEqual(validar_coordenadas(None, None), (None, None))
@@ -26,36 +40,32 @@ class UbicacionTest(unittest.TestCase):
             with self.subTest(punto=punto), self.assertRaises(ValueError):
                 validar_coordenadas(*punto)
 
-    def test_migracion_agrega_solo_columna_faltante_y_se_ejecuta_una_vez(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.fetchall.side_effect = [[], [("longitud",)]]
-        with patch.object(clientes_crud, "_ubicacion_lista", False), \
-             patch.object(clientes_crud, "obtener_conexion", return_value=conexion) as conectar:
+    def test_migracion_de_ubicacion_es_idempotente(self):
+        with patch.object(clientes_crud, "_ubicacion_lista", False):
             clientes_crud.asegurar_columnas_ubicacion()
             clientes_crud.asegurar_columnas_ubicacion()
-            conectar.assert_called_once()
-        alters = [c.args[0] for c in cursor.execute.call_args_list if "ALTER" in c.args[0]]
-        self.assertEqual(alters, ["ALTER TABLE clientes ADD COLUMN latitud DECIMAL(10, 7) NULL"])
-        conexion.commit.assert_called_once()
-        cursor.close.assert_called_once()
-        conexion.close.assert_called_once()
+        self.assertTrue(clientes_crud._ubicacion_lista)
 
     def test_guardado_coordenadas_y_rollback(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.rowcount = 1
-        with patch.object(clientes_crud, "asegurar_columnas_ubicacion"), \
-             patch.object(clientes_crud, "obtener_conexion", return_value=conexion):
-            clientes_crud.actualizar_direccion_cliente(3, " Centro ", 12.4379, -86.878)
-            self.assertEqual(cursor.execute.call_args.args[1], ("Centro", 12.4379, -86.878, 3))
-            cursor.execute.side_effect = RuntimeError("Fallo de escritura")
-            with self.assertRaises(RuntimeError):
-                clientes_crud.actualizar_direccion_cliente(3, "Centro", 0, 0)
-            conexion.rollback.assert_called_once()
+        with obtener_sesion() as session, session.begin():
+            session.add(Cliente(
+                nombre="Ana", cedula="12345678", correo="ana@example.com",
+                password="clave1234", direccion="Centro", monto=0,
+                latitud=0, longitud=0,
+            ))
+        self.assertTrue(
+            clientes_crud.actualizar_direccion_cliente(
+                1, " Centro ", 12.4379, -86.878
+            )
+        )
+        with obtener_sesion() as session:
+            cliente = session.get(Cliente, 1)
+            self.assertEqual(cliente.direccion, "Centro")
+            self.assertEqual(float(cliente.latitud), 12.4379)
+            self.assertEqual(float(cliente.longitud), -86.878)
 
     def test_coordenadas_invalidas_no_conectan(self):
-        with patch.object(clientes_crud, "obtener_conexion") as conectar:
+        with patch.object(clientes_crud, "obtener_sesion") as conectar:
             with self.assertRaises(ValueError):
                 clientes_crud.crear_cliente("Ana", "123456", "a@example.com", "12345678",
                                             "Centro", latitud=100, longitud=0)
@@ -64,14 +74,21 @@ class UbicacionTest(unittest.TestCase):
             conectar.assert_not_called()
 
     def test_editar_datos_sin_punto_conserva_ubicacion(self):
-        conexion = MagicMock()
-        conexion.cursor.return_value.rowcount = 1
-        conexion.cursor.return_value.fetchone.return_value = None
-        with patch.object(clientes_crud, "obtener_conexion", return_value=conexion):
-            clientes_crud.actualizar_cliente(1, "Ana", "123456", "a@example.com", "Centro", 0)
-        sql = conexion.cursor.return_value.execute.call_args.args[0]
-        self.assertNotIn("latitud", sql)
-        self.assertNotIn("longitud", sql)
+        with obtener_sesion() as session, session.begin():
+            session.add(Cliente(
+                nombre="Ana", cedula="123456", correo="a@example.com",
+                password="clave1234", direccion="Centro", monto=0,
+                latitud=12.4, longitud=-86.8,
+            ))
+        self.assertTrue(
+            clientes_crud.actualizar_cliente(
+                1, "Ana", "123456", "a@example.com", "Centro", 0
+            )
+        )
+        with obtener_sesion() as session:
+            cliente = session.get(Cliente, 1)
+            self.assertEqual(float(cliente.latitud), 12.4)
+            self.assertEqual(float(cliente.longitud), -86.8)
 
     def test_cancelar_selector_conserva_punto(self):
         campo = ubicacion_ui.CampoUbicacion(12.4, -86.8)

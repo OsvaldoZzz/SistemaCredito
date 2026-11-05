@@ -3,7 +3,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import QDate, QSize, Qt
 from PySide6.QtGui import QIcon
 from datetime import date
-from mysql.connector import Error as MySQLConnectorError
+from app.config.errores_db import ERRORES_BASE_DATOS
 from app.datos.citas_crud import crear_cita
 from app.datos.prestamos_crud import listar_prestamos
 from app.ui.estilos_botones_panel import ESTILOS_BOTONES_PANEL
@@ -395,7 +395,7 @@ class ClienteWindow(QMainWindow):
             )
             try:
                 cita_id = crear_cita(int(cliente_id), fecha)
-            except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
                 QMessageBox.critical(
                     self,
                     "Error al agendar cita",
@@ -425,7 +425,7 @@ class ClienteWindow(QMainWindow):
 
         try:
             prestamos = listar_prestamos(int(cliente_id))
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al cargar préstamos",
@@ -485,7 +485,7 @@ class ClienteWindow(QMainWindow):
     def verCuotas(self, prestamo_id):
         try:
             mostrar_detalle_prestamo(self, int(prestamo_id))
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             mostrar_error_detalle_prestamo(self, error)
 
     def btnCerrSes(self):

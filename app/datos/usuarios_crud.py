@@ -1,62 +1,44 @@
 from typing import Any
 
-from app.config.conexion import obtener_conexion
+from sqlalchemy import delete, func, select
+
+from app.config.conexion import obtener_sesion
+from app.datos.modelos import CobradorCliente, Cliente, Usuario
 from app.logica.validaciones import validar_datos_rol, validar_id
 
 
-def _asegurar_tabla_asignaciones(cursor) -> None:
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS cobrador_clientes (
-            cobrador_id INT NOT NULL,
-            cliente_id INT NOT NULL,
-            PRIMARY KEY (cobrador_id, cliente_id),
-            CONSTRAINT fk_cobrador_clientes_usuario
-                FOREIGN KEY (cobrador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-            CONSTRAINT fk_cobrador_clientes_cliente
-                FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB
-        """
-    )
+def _asegurar_tabla_asignaciones(session) -> None:
+    CobradorCliente.__table__.create(session.connection(), checkfirst=True)
 
 
 def listar_usuarios() -> list[dict[str, Any]]:
-    """Lee los usuarios con rol (administrador, recepcionista, cobrador) de MySQL.
-
-    La tabla guarda el nombre en la columna ``nombre``; el programa lo usa como
-    ``usuario``. El ID se devuelve como texto, igual que en la lista interna.
-    """
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        _asegurar_tabla_asignaciones(cursor)
-        cursor.execute("SELECT id, rol, nombre, password FROM usuarios ORDER BY id")
+    """Devuelve usuarios con los clientes asignados a cada cobrador."""
+    with obtener_sesion() as session, session.begin():
+        _asegurar_tabla_asignaciones(session)
         usuarios = [
             {
-                "id": str(fila["id"]),
-                "rol": fila["rol"],
-                "usuario": fila["nombre"],
-                "password": fila["password"],
+                "id": str(usuario.id),
+                "rol": usuario.rol,
+                "usuario": usuario.nombre,
+                "password": usuario.password,
             }
-            for fila in cursor.fetchall()
+            for usuario in session.scalars(
+                select(Usuario).order_by(Usuario.id)
+            ).all()
         ]
-        cursor.execute(
-            "SELECT cobrador_id, cliente_id FROM cobrador_clientes ORDER BY cliente_id"
-        )
         asignaciones: dict[str, list[str]] = {}
-        for fila in cursor.fetchall():
-            asignaciones.setdefault(str(fila["cobrador_id"]), []).append(
-                f"id:{fila['cliente_id']}"
+        filas = session.execute(
+            select(CobradorCliente.cobrador_id, CobradorCliente.cliente_id)
+            .order_by(CobradorCliente.cliente_id)
+        )
+        for cobrador_id, cliente_id in filas:
+            asignaciones.setdefault(str(cobrador_id), []).append(
+                f"id:{cliente_id}"
             )
         for usuario in usuarios:
             if usuario["rol"] == "cobrador":
                 usuario["clientes_asignados"] = asignaciones.get(usuario["id"], [])
         return usuarios
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
 
 
 def guardar_asignaciones_cobrador(
@@ -69,54 +51,39 @@ def guardar_asignaciones_cobrador(
     for cliente_id in cliente_ids_unicos:
         validar_id(cliente_id)
 
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor()
-        _asegurar_tabla_asignaciones(cursor)
-        cursor.execute(
-            "SELECT rol FROM usuarios WHERE id = %s",
-            (cobrador_id,),
+    with obtener_sesion() as session, session.begin():
+        _asegurar_tabla_asignaciones(session)
+        usuario = session.scalar(
+            select(Usuario)
+            .where(Usuario.id == cobrador_id)
+            .with_for_update()
         )
-        usuario = cursor.fetchone()
         if usuario is None:
             raise ValueError("El cobrador ya no existe en la base de datos.")
-        if usuario[0] != "cobrador":
+        if usuario.rol != "cobrador":
             raise ValueError("Solo se pueden asignar clientes a un cobrador.")
 
         if cliente_ids_unicos:
-            marcadores = ", ".join(["%s"] * len(cliente_ids_unicos))
-            cursor.execute(
-                f"SELECT id FROM clientes WHERE id IN ({marcadores})",
-                tuple(cliente_ids_unicos),
+            encontrados = set(
+                session.scalars(
+                    select(Cliente.id).where(Cliente.id.in_(cliente_ids_unicos))
+                ).all()
             )
-            encontrados = {fila[0] for fila in cursor.fetchall()}
             if encontrados != set(cliente_ids_unicos):
                 raise ValueError(
                     "Uno o más clientes seleccionados ya no existen en la base de datos."
                 )
 
-        cursor.execute(
-            "DELETE FROM cobrador_clientes WHERE cobrador_id = %s",
-            (cobrador_id,),
-        )
-        if cliente_ids_unicos:
-            cursor.executemany(
-                """
-                INSERT INTO cobrador_clientes (cobrador_id, cliente_id)
-                VALUES (%s, %s)
-                """,
-                [(cobrador_id, cliente_id) for cliente_id in cliente_ids_unicos],
+        session.execute(
+            delete(CobradorCliente).where(
+                CobradorCliente.cobrador_id == cobrador_id
             )
-        conexion.commit()
+        )
+        session.add_all(
+            CobradorCliente(cobrador_id=cobrador_id, cliente_id=cliente_id)
+            for cliente_id in cliente_ids_unicos
+        )
         return True
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
 
 
 def actualizar_usuario(
@@ -128,50 +95,31 @@ def actualizar_usuario(
     """Actualiza el nombre, rol y, si se indicó, contraseña de un usuario."""
     validar_id(usuario_id)
     nombre = nombre.strip() if isinstance(nombre, str) else nombre
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT id, password FROM usuarios WHERE id = %s",
-            (usuario_id,),
-        )
-        usuario_actual = cursor.fetchone()
-        if usuario_actual is None:
+    with obtener_sesion() as session, session.begin():
+        usuario = session.get(Usuario, usuario_id)
+        if usuario is None:
             return False
 
         password_validacion = (
-            password if password is not None else usuario_actual["password"]
+            password if password is not None else usuario.password
         )
         error = validar_datos_rol(nombre, password_validacion, rol, [])
         if error:
             raise ValueError(error)
 
-        cursor.execute(
-            """
-            SELECT id FROM usuarios
-            WHERE LOWER(TRIM(nombre)) = %s AND id <> %s
-            LIMIT 1
-            """,
-            (nombre.casefold(), usuario_id),
+        duplicado = session.scalar(
+            select(Usuario.id)
+            .where(
+                func.lower(func.trim(Usuario.nombre)) == nombre.casefold(),
+                Usuario.id != usuario_id,
+            )
+            .limit(1)
         )
-        if cursor.fetchone() is not None:
+        if duplicado is not None:
             raise ValueError("Ya existe un usuario con ese nombre.")
 
-        sql = "UPDATE usuarios SET nombre = %s, rol = %s"
-        parametros = [nombre, rol]
+        usuario.nombre = nombre
+        usuario.rol = rol
         if password is not None:
-            sql += ", password = %s"
-            parametros.append(password)
-        sql += " WHERE id = %s"
-        parametros.append(usuario_id)
-        cursor.execute(sql, tuple(parametros))
-        conexion.commit()
+            usuario.password = password
         return True
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()

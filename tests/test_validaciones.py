@@ -2,7 +2,7 @@ import os
 import unittest
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -17,9 +17,16 @@ from app.logica.calculos_prestamo import (
     calcular_mora,
 )
 from app.datos import clientes_crud, citas_crud, prestamos_crud, solicitudes_crud
+from app.config.conexion import obtener_sesion
+from app.datos.modelos import Cliente
+from orm_test_utils import OrmTestCase
 
 
-class ValidacionesTest(unittest.TestCase):
+class ValidacionesTest(OrmTestCase):
+    def setUp(self):
+        super().setUp()
+        clientes_crud._ubicacion_lista = True
+
     def test_montos_invalidos(self):
         for valor in (-1, 0, 0.001, 100_000_001, "nan", "inf", "abc", None, True):
             with self.subTest(valor=valor), self.assertRaises(ValueError):
@@ -95,7 +102,7 @@ class ValidacionesTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             generar_cuotas(100, 3, date.today(), "Diario")
 
-    def test_entradas_invalidas_no_conectan_a_mysql(self):
+    def test_entradas_invalidas_no_abren_sesion(self):
         casos = (
             (clientes_crud, clientes_crud.crear_cliente, ("123", "12345678", "a@example.com", "12345678", "Centro")),
             (clientes_crud, clientes_crud.actualizar_cliente, (0, "Ana", "12345678", "a@example.com", "Centro", 0)),
@@ -108,10 +115,10 @@ class ValidacionesTest(unittest.TestCase):
             (solicitudes_crud, solicitudes_crud.resolver_solicitud_prestamo, (1, "si")),
         )
         for modulo, funcion, args in casos:
-            with self.subTest(funcion=funcion.__name__, args=args), patch.object(modulo, "obtener_conexion") as conectar:
+            with self.subTest(funcion=funcion.__name__, args=args), patch.object(modulo, "obtener_sesion") as obtener:
                 with self.assertRaises(ValueError):
                     funcion(*args)
-                conectar.assert_not_called()
+                obtener.assert_not_called()
 
     def test_calendarios_y_mora(self):
         inicio = date(2028, 1, 31)
@@ -144,128 +151,88 @@ class ValidacionesTest(unittest.TestCase):
             Decimal("2.00"),
         )
 
+    def _crear_cliente(self):
+        with obtener_sesion() as session, session.begin():
+            session.add(Cliente(
+                nombre="Ana",
+                cedula="12345678",
+                correo="ana@example.com",
+                password="clave1234",
+                direccion="Centro",
+                monto=0,
+            ))
+
     def test_cliente_con_prestamo_pendiente_no_puede_crear_otro(self):
-        cursor = MagicMock()
-        cursor.fetchone.return_value = {"id": 1}
-        cursor.fetchall.return_value = [{"id": 5}]
-
-        with patch.object(
-            prestamos_crud,
-            "_cargar_cuotas_prestamo",
-            return_value=[{"total_pendiente": Decimal("1.00")}],
-        ), self.assertRaisesRegex(ValueError, "saldo pendiente"):
-            prestamos_crud.validar_cliente_sin_prestamos_pendientes(cursor, 1)
-
-    def test_crear_prestamo_rechaza_cliente_con_saldo_pendiente(self):
-        conexion = MagicMock()
-        with patch.object(
-            prestamos_crud,
-            "obtener_conexion",
-            return_value=conexion,
-        ), patch.object(
-            prestamos_crud,
-            "asegurar_esquema_prestamos",
-        ), patch.object(
-            prestamos_crud,
-            "validar_cliente_sin_prestamos_pendientes",
-            side_effect=ValueError("El cliente ya tiene saldo pendiente."),
-        ), self.assertRaisesRegex(ValueError, "saldo pendiente"):
-            prestamos_crud.crear_prestamo(1, 100, 4)
-
-        conexion.cursor.assert_called_once_with(dictionary=True)
-        conexion.rollback.assert_called_once()
+        self._crear_cliente()
+        prestamos_crud.crear_prestamo(1, 100, 1, fecha_primer_pago=date.today())
+        with self.assertRaisesRegex(ValueError, "saldo pendiente"):
+            prestamos_crud.crear_prestamo(1, 100, 1)
 
     def test_solicitud_rechaza_cliente_con_saldo_pendiente(self):
-        conexion = MagicMock()
-        with patch.object(
-            solicitudes_crud,
-            "obtener_conexion",
-            return_value=conexion,
-        ), patch.object(
-            solicitudes_crud,
-            "_crear_tabla_solicitudes",
-        ), patch.object(
-            solicitudes_crud,
-            "asegurar_esquema_prestamos",
-        ), patch.object(
-            solicitudes_crud,
-            "validar_cliente_sin_prestamos_pendientes",
-            side_effect=ValueError("El cliente ya tiene saldo pendiente."),
-        ), self.assertRaisesRegex(ValueError, "saldo pendiente"):
+        self._crear_cliente()
+        prestamos_crud.crear_prestamo(1, 100, 1, fecha_primer_pago=date.today())
+        with self.assertRaisesRegex(ValueError, "saldo pendiente"):
             solicitudes_crud.crear_solicitud_prestamo(1, 100, 4, 50)
 
-        conexion.rollback.assert_called_once()
-
     def test_cliente_puede_crear_prestamo_despues_de_liquidar(self):
-        cursor = MagicMock()
-        cursor.fetchone.return_value = {"id": 1}
-        cursor.fetchall.return_value = [{"id": 5}]
-
-        with patch.object(
-            prestamos_crud,
-            "_cargar_cuotas_prestamo",
-            return_value=[{"total_pendiente": Decimal("0.00")}],
-        ):
-            prestamos_crud.validar_cliente_sin_prestamos_pendientes(cursor, 1)
+        self._crear_cliente()
+        prestamos_crud.crear_prestamo(
+            1, 100, 1, fecha_primer_pago=date.today() + timedelta(days=1)
+        )
+        prestamos_crud.registrar_abono_cuota(
+            1, 1, calcular_total_prestamo(100)
+        )
+        self.assertEqual(prestamos_crud.crear_prestamo(1, 100, 1), 2)
 
     def test_prestamo_con_abonos_protege_monto_y_plazo(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.fetchone.side_effect = [dict(id=1, monto=100, plazo=4), dict(cantidad=1)]
-        with patch.object(prestamos_crud, "obtener_conexion", return_value=conexion), \
-             patch.object(prestamos_crud, "asegurar_esquema_prestamos"), self.assertRaises(ValueError):
+        self._crear_cliente()
+        prestamos_crud.crear_prestamo(1, 100, 4)
+        prestamos_crud.registrar_abono_cuota(1, 1, 1)
+        with self.assertRaisesRegex(ValueError, "ya tiene abonos"):
             prestamos_crud.actualizar_prestamo(1, 200, 4, "Activo")
-        conexion.commit.assert_not_called()
 
     def test_no_marcar_pagado_con_saldo(self):
-        conexion = MagicMock()
-        conexion.cursor.return_value.fetchone.side_effect = [dict(id=1, monto=100, plazo=4), dict(cantidad=0)]
-        with patch.object(prestamos_crud, "obtener_conexion", return_value=conexion), \
-             patch.object(prestamos_crud, "asegurar_esquema_prestamos"), \
-             patch.object(prestamos_crud, "_cargar_cuotas_prestamo", return_value=[dict(total_pendiente=100)]), self.assertRaises(ValueError):
-            prestamos_crud.actualizar_prestamo(1, 100, 4, "Pagado")
-        conexion.commit.assert_not_called()
+        self._crear_cliente()
+        prestamos_crud.crear_prestamo(1, 100, 1)
+        with self.assertRaisesRegex(ValueError, "saldo pendiente"):
+            prestamos_crud.actualizar_prestamo(1, 100, 1, "Pagado")
 
-    def test_solicitud_resuelta_no_crea_otro_prestamo(self):
-        conexion = MagicMock()
-        conexion.cursor.return_value.fetchone.return_value = None
-        with patch.object(solicitudes_crud, "obtener_conexion", return_value=conexion), \
-             patch.object(solicitudes_crud, "_crear_tabla_solicitudes"), \
-             patch.object(solicitudes_crud, "asegurar_esquema_prestamos"), self.assertRaises(ValueError):
+    def test_solicitud_resuelta_no_crea_prestamo(self):
+        self._crear_cliente()
+        solicitudes_crud.crear_solicitud_prestamo(1, 100, 4, 50)
+        self.assertIsNone(solicitudes_crud.resolver_solicitud_prestamo(1, False))
+        with self.assertRaisesRegex(ValueError, "ya fue resuelta"):
             solicitudes_crud.resolver_solicitud_prestamo(1, True, date.today())
-        conexion.commit.assert_not_called()
 
-    def test_cliente_duplicado_y_normalizacion(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        with patch.object(clientes_crud, "obtener_conexion", return_value=conexion):
-            cursor.fetchone.return_value = (1,)
-            with self.assertRaises(ValueError):
-                clientes_crud.crear_cliente("Ana", "12345678", "a@example.com", "12345678", "Centro")
-            conexion.rollback.assert_called_once()
-            self.assertFalse(any("INSERT" in c.args[0] for c in cursor.execute.call_args_list))
-            cursor.fetchone.return_value = None
-            clientes_crud.crear_cliente(" Ana ", "12345678", " a@example.com ", "claveLarga12", " Centro ")
-            args = cursor.execute.call_args.args[1]
-            self.assertEqual(args[:3], ("Ana", "12345678", "a@example.com"))
+    def test_cliente_duplicado_compara_datos_normalizados(self):
+        clientes_crud.crear_cliente(
+            " Ana ", "12345678", " ana@example.com ", "claveLarga12", " Centro "
+        )
+        with self.assertRaisesRegex(ValueError, "Ya existe un cliente"):
+            clientes_crud.crear_cliente(
+                "Ana", "12345678", "otra@example.com", "claveLarga12", "Centro"
+            )
+        with self.assertRaisesRegex(ValueError, "Ya existe un cliente"):
+            clientes_crud.crear_cliente(
+                "Ana", "87654321", "ANA@example.com", "claveLarga12", "Centro"
+            )
+        cliente = clientes_crud.listar_clientes()[0]
+        self.assertEqual(
+            (cliente["nombre"], cliente["cedula"], cliente["correo"], cliente["direccion"]),
+            ("Ana", "12345678", "ana@example.com", "Centro"),
+        )
 
     def test_cita_duplicada_no_se_guarda(self):
-        conexion = MagicMock()
-        conexion.cursor.return_value.fetchone.return_value = (1,)
-        with patch.object(citas_crud, "obtener_conexion", return_value=conexion), self.assertRaises(ValueError):
+        self._crear_cliente()
+        citas_crud.crear_cita(1, date.today())
+        with self.assertRaisesRegex(ValueError, "Ya tienes una cita"):
             citas_crud.crear_cita(1, date.today())
-        conexion.commit.assert_not_called()
-        conexion.rollback.assert_called_once()
 
-    def test_abono_superior_al_saldo(self):
-        conexion = MagicMock()
-        conexion.cursor.return_value.fetchone.return_value = {"id": 1}
-        with patch.object(prestamos_crud, "obtener_conexion", return_value=conexion), \
-             patch.object(prestamos_crud, "asegurar_esquema_prestamos"), \
-             patch.object(prestamos_crud, "_cargar_cuotas_prestamo", return_value=[dict(numero=1, total_pendiente=Decimal("10"))]):
-            with self.assertRaises(ValueError):
-                prestamos_crud.registrar_abono_cuota(1, 1, 11)
-        conexion.commit.assert_not_called()
+    def test_abono_superior_al_saldo_se_rechaza(self):
+        self._crear_cliente()
+        prestamos_crud.crear_prestamo(1, 100, 1)
+        with self.assertRaisesRegex(ValueError, "no puede superar"):
+            prestamos_crud.registrar_abono_cuota(1, 1, 116)
 
 
 class FormulariosTest(unittest.TestCase):

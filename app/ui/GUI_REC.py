@@ -4,7 +4,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QHeaderView
-from mysql.connector import Error as MySQLConnectorError
+from app.config.errores_db import ERRORES_BASE_DATOS
 from app.datos.clientes_crud import actualizar_cliente, crear_cliente, eliminar_cliente, listar_clientes
 from app.datos.citas_crud import (
     listar_todas_las_citas,
@@ -638,7 +638,7 @@ class RecepWindow(QMainWindow):
         cliente_id = cliente_actual.get("id") if cliente_actual else None
         try:
             clientes = listar_clientes()
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al actualizar",
@@ -701,7 +701,7 @@ class RecepWindow(QMainWindow):
         try:
             prestamos = listar_prestamos(int(cliente["id"]))
         except (
-            MySQLConnectorError,
+            *ERRORES_BASE_DATOS,
             OSError,
             ValueError,
             KeyError,
@@ -781,7 +781,7 @@ class RecepWindow(QMainWindow):
             return
         try:
             mostrar_detalle_prestamo(self, int(id_item.text()))
-        except (MySQLConnectorError, OSError, TypeError, ValueError) as error:
+        except ERRORES_BASE_DATOS + (OSError, TypeError, ValueError) as error:
             mostrar_error_detalle_prestamo(self, error)
 
     # ==========================================================
@@ -904,7 +904,7 @@ class RecepWindow(QMainWindow):
                     datos["correo"], datos["direccion"], cliente.get("monto", 0),
                     password=nueva_password or None
                 )
-            except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
                 QMessageBox.critical(dialogo, "Error al actualizar", f"No se pudo guardar el cliente: {error}")
                 return
             if not actualizado:
@@ -1154,7 +1154,7 @@ class RecepWindow(QMainWindow):
                 latitud=self.newCl["latitud"], longitud=self.newCl["longitud"],
             )
         except (
-            MySQLConnectorError,
+            *ERRORES_BASE_DATOS,
             OSError,
             ValueError,
             KeyError,
@@ -1459,7 +1459,7 @@ class RecepWindow(QMainWindow):
                     ingreso_mensual=ingreso_input.value(),
                     frecuencia_pago=frecuencia_input.currentText(),
                 )
-            except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
                 QMessageBox.critical(
                     dialogo,
                     "Error al registrar solicitud",
@@ -1522,7 +1522,7 @@ class RecepWindow(QMainWindow):
 
         try:
             registrado = abrir_dialogo_abono(self, int(id_item.text()))
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al registrar abono",
@@ -1535,7 +1535,7 @@ class RecepWindow(QMainWindow):
     def verCitas(self):
         try:
             citas = listar_todas_las_citas()
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al consultar citas",

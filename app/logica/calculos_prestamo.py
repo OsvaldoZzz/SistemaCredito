@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, ROUND_DOWN
 from app.logica.validaciones import validar_condiciones_prestamo, validar_fecha, validar_monto
 
 
-TASA_INTERES = Decimal("0.02")
+TASA_INTERES = Decimal("0.15")
 TASA_MORA_MENSUAL = Decimal("0.02")
 PORCENTAJE_INTERES = TASA_INTERES * 100
 CENTAVO = Decimal("0.01")

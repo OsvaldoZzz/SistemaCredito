@@ -5,7 +5,11 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 import os
 from decimal import Decimal
-from app.logica.calculos_prestamo import calcular_interes, calcular_total_prestamo
+from app.logica.calculos_prestamo import (
+    PORCENTAJE_INTERES,
+    calcular_interes,
+    calcular_total_prestamo,
+)
 from app.config.rutas import ruta_reporte
 
 
@@ -27,7 +31,8 @@ def generar_estado_cartera(clientes, prestamos_por_cliente, filename="estado_car
 
     # Datos de la tabla
     data = [[
-        "Cliente", "Cédula", "Capital", "Interés (2%)", "Total a pagar", "Estado"
+        "Cliente", "Cédula", "Capital",
+        f"Interés ({PORCENTAJE_INTERES:.0f}%)", "Total a pagar", "Estado"
     ]]
 
     for cliente in clientes:
@@ -83,7 +88,8 @@ def generar_reporte_cobranza(clientes, prestamos_por_cliente, filename="reporte_
     elements.append(Spacer(1, 12))
 
     data = [[
-        "ID Préstamo", "Cliente", "Capital", "Interés (2%)",
+        "ID Préstamo", "Cliente", "Capital",
+        f"Interés ({PORCENTAJE_INTERES:.0f}%)",
         "Total", "Plazo", "Estado"
     ]]
 

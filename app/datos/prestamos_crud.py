@@ -3,49 +3,53 @@ from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
+from sqlalchemy import delete, func, inspect, select, text, update
+from sqlalchemy.orm import Session
+
+from app.config.conexion import obtener_sesion
+from app.datos.modelos import Cliente, PagoPrestamo, Prestamo
 from app.logica.calculos_prestamo import calcular_estado_cuota, generar_cuotas
-from app.config.conexion import obtener_conexion
-from app.logica.validaciones import validar_condiciones_prestamo, validar_fecha, validar_id, validar_monto
+from app.logica.validaciones import (
+    validar_condiciones_prestamo,
+    validar_fecha,
+    validar_id,
+    validar_monto,
+)
 
 
-def asegurar_esquema_prestamos(cursor) -> None:
-    cursor.execute("SHOW COLUMNS FROM prestamo LIKE 'frecuencia_pago'")
-    if not cursor.fetchall():
-        cursor.execute(
-            "ALTER TABLE prestamo "
-            "ADD COLUMN frecuencia_pago VARCHAR(10) NOT NULL DEFAULT 'Mensual'"
+def asegurar_esquema_prestamos(session: Session) -> None:
+    """Actualiza las columnas heredadas y crea la tabla de abonos si hace falta."""
+    columnas = {
+        columna["name"]
+        for columna in inspect(session.connection()).get_columns("prestamo")
+    }
+    if "frecuencia_pago" not in columnas:
+        session.execute(
+            text(
+                "ALTER TABLE prestamo "
+                "ADD COLUMN frecuencia_pago VARCHAR(10) NOT NULL DEFAULT 'Mensual'"
+            )
         )
-    cursor.execute(
-        "SHOW COLUMNS FROM prestamo LIKE 'fecha_primer_pago'"
-    )
-    if not cursor.fetchall():
-        cursor.execute(
-            "ALTER TABLE prestamo "
-            "ADD COLUMN fecha_primer_pago DATE NULL"
+    if "fecha_primer_pago" not in columnas:
+        session.execute(
+            text("ALTER TABLE prestamo ADD COLUMN fecha_primer_pago DATE NULL")
         )
-    cursor.execute(
-        """
-        UPDATE prestamo
-        SET fecha_primer_pago = DATE_ADD(CURDATE(), INTERVAL 1 MONTH)
-        WHERE fecha_primer_pago IS NULL
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS pagos_prestamo (
-            id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            prestamo_id INT NOT NULL,
-            numero_cuota INT NOT NULL,
-            monto DECIMAL(12, 2) NOT NULL,
-            fecha_pago DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_pagos_prestamo_cuota
-                (prestamo_id, numero_cuota, fecha_pago),
-            CONSTRAINT fk_pagos_prestamo
-                FOREIGN KEY (prestamo_id) REFERENCES prestamo(id)
-                ON DELETE CASCADE
-        ) ENGINE=InnoDB
-        """
-    )
+    if session.bind.dialect.name == "sqlite":
+        fecha_siguiente = _fecha_mes_siguiente(date.today())
+        session.execute(
+            update(Prestamo)
+            .where(Prestamo.fecha_primer_pago.is_(None))
+            .values(fecha_primer_pago=fecha_siguiente)
+        )
+    else:
+        session.execute(
+            text(
+                "UPDATE prestamo "
+                "SET fecha_primer_pago = DATE_ADD(CURDATE(), INTERVAL 1 MONTH) "
+                "WHERE fecha_primer_pago IS NULL"
+            )
+        )
+    PagoPrestamo.__table__.create(session.connection(), checkfirst=True)
 
 
 def _fecha_mes_siguiente(fecha: date) -> date:
@@ -55,47 +59,42 @@ def _fecha_mes_siguiente(fecha: date) -> date:
     return date(anio, mes, dia)
 
 
-def _cargar_cuotas_prestamo(cursor, prestamo_id: int) -> list[dict[str, Any]]:
-    cursor.execute(
-        """
-        SELECT monto, plazo, fecha_primer_pago, frecuencia_pago
-        FROM prestamo
-        WHERE id = %s
-        """,
-        (prestamo_id,),
-    )
-    prestamo = cursor.fetchone()
+def _cargar_cuotas_prestamo(
+    session: Session,
+    prestamo_id: int,
+) -> list[dict[str, Any]]:
+    prestamo = session.get(Prestamo, prestamo_id)
     if prestamo is None:
         raise ValueError("El préstamo no existe.")
 
-    cursor.execute(
-        """
-        SELECT numero_cuota, monto, fecha_pago
-        FROM pagos_prestamo
-        WHERE prestamo_id = %s
-        ORDER BY fecha_pago, id
-        """,
-        (prestamo_id,),
-    )
+    pagos = session.scalars(
+        select(PagoPrestamo)
+        .where(PagoPrestamo.prestamo_id == prestamo_id)
+        .order_by(PagoPrestamo.fecha_pago, PagoPrestamo.id)
+    ).all()
     pagos_por_cuota: dict[int, list[dict[str, Any]]] = {}
-    for pago in cursor.fetchall():
-        pagos_por_cuota.setdefault(pago["numero_cuota"], []).append(pago)
+    for pago in pagos:
+        pagos_por_cuota.setdefault(pago.numero_cuota, []).append({
+            "id": pago.id,
+            "numero_cuota": pago.numero_cuota,
+            "monto": pago.monto,
+            "fecha_pago": pago.fecha_pago,
+        })
 
-    cursor.execute("SELECT CURRENT_DATE AS fecha_corte")
-    fecha_corte = cursor.fetchone()["fecha_corte"]
+    fecha_corte = session.scalar(select(func.current_date()))
     cuotas = generar_cuotas(
-        prestamo["monto"],
-        prestamo["plazo"],
-        prestamo["fecha_primer_pago"],
-        prestamo["frecuencia_pago"],
+        prestamo.monto,
+        prestamo.plazo,
+        prestamo.fecha_primer_pago,
+        prestamo.frecuencia_pago,
     )
     resultado = []
     for cuota in cuotas:
-        pagos = pagos_por_cuota.get(cuota["numero"], [])
+        pagos_cuota = pagos_por_cuota.get(cuota["numero"], [])
         estado = calcular_estado_cuota(
             cuota["monto"],
             cuota["fecha_vencimiento"],
-            pagos,
+            pagos_cuota,
             fecha_corte,
         )
         resultado.append({
@@ -103,22 +102,22 @@ def _cargar_cuotas_prestamo(cursor, prestamo_id: int) -> list[dict[str, Any]]:
             **estado,
             "fecha_corte": fecha_corte,
             "pagado": sum(
-                (Decimal(str(pago["monto"])) for pago in pagos),
+                (Decimal(str(pago["monto"])) for pago in pagos_cuota),
                 Decimal("0.00"),
             ),
-            "ultimo_pago": pagos[-1]["fecha_pago"] if pagos else None,
-            "pagos": pagos,
+            "ultimo_pago": pagos_cuota[-1]["fecha_pago"] if pagos_cuota else None,
+            "pagos": pagos_cuota,
             "pagos_calculados": estado["pagos_calculados"],
         })
     return resultado
 
 
 def _agregar_cuotas_pendientes(
-    cursor,
+    session: Session,
     prestamos: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     for prestamo in prestamos:
-        cuotas = _cargar_cuotas_prestamo(cursor, prestamo["id"])
+        cuotas = _cargar_cuotas_prestamo(session, prestamo["id"])
         pendientes = [cuota for cuota in cuotas if cuota["total_pendiente"] > 0]
         prestamo["cuotas_pendientes"] = len(pendientes)
         prestamo["saldo_pendiente"] = sum(
@@ -135,23 +134,25 @@ def _agregar_cuotas_pendientes(
     return prestamos
 
 
-def validar_cliente_sin_prestamos_pendientes(cursor, cliente_id: int) -> None:
-    cursor.execute(
-        "SELECT id FROM clientes WHERE id = %s FOR UPDATE",
-        (cliente_id,),
+def validar_cliente_sin_prestamos_pendientes(
+    session: Session,
+    cliente_id: int,
+) -> None:
+    cliente = session.scalar(
+        select(Cliente.id).where(Cliente.id == cliente_id).with_for_update()
     )
-    if cursor.fetchone() is None:
+    if cliente is None:
         raise ValueError("El cliente no existe.")
 
-    cursor.execute(
-        "SELECT id FROM prestamo WHERE cliente_id = %s FOR UPDATE",
-        (cliente_id,),
-    )
-    prestamos = cursor.fetchall()
-    for prestamo in prestamos:
+    prestamos = session.scalars(
+        select(Prestamo.id)
+        .where(Prestamo.cliente_id == cliente_id)
+        .with_for_update()
+    ).all()
+    for prestamo_id in prestamos:
         if any(
             cuota["total_pendiente"] > 0
-            for cuota in _cargar_cuotas_prestamo(cursor, prestamo["id"])
+            for cuota in _cargar_cuotas_prestamo(session, prestamo_id)
         ):
             raise ValueError(
                 "El cliente ya tiene un préstamo con saldo pendiente. "
@@ -161,21 +162,9 @@ def validar_cliente_sin_prestamos_pendientes(cursor, cliente_id: int) -> None:
 
 def listar_cuotas_prestamo(prestamo_id: int) -> list[dict[str, Any]]:
     validar_id(prestamo_id)
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        asegurar_esquema_prestamos(cursor)
-        cuotas = _cargar_cuotas_prestamo(cursor, prestamo_id)
-        conexion.commit()
-        return cuotas
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+    with obtener_sesion() as session, session.begin():
+        asegurar_esquema_prestamos(session)
+        return _cargar_cuotas_prestamo(session, prestamo_id)
 
 
 def registrar_abono_cuota(
@@ -185,25 +174,22 @@ def registrar_abono_cuota(
 ) -> dict[str, Any]:
     validar_id(prestamo_id)
     validar_id(numero_cuota)
-    monto_pago = validar_monto(monto)
-    monto_pago = monto_pago.quantize(
+    monto_pago = validar_monto(monto).quantize(
         Decimal("0.01"),
         rounding=ROUND_HALF_UP,
     )
 
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        asegurar_esquema_prestamos(cursor)
-        cursor.execute(
-            "SELECT id FROM prestamo WHERE id = %s FOR UPDATE",
-            (prestamo_id,),
+    with obtener_sesion() as session, session.begin():
+        asegurar_esquema_prestamos(session)
+        prestamo = session.scalar(
+            select(Prestamo)
+            .where(Prestamo.id == prestamo_id)
+            .with_for_update()
         )
-        if cursor.fetchone() is None:
+        if prestamo is None:
             raise ValueError("El préstamo no existe.")
 
-        cuotas = _cargar_cuotas_prestamo(cursor, prestamo_id)
+        cuotas = _cargar_cuotas_prestamo(session, prestamo_id)
         cuota = next(
             (item for item in cuotas if item["numero"] == numero_cuota),
             None,
@@ -215,21 +201,16 @@ def registrar_abono_cuota(
                 "El abono no puede superar el total pendiente de la cuota."
             )
 
-        cursor.execute(
-            """
-            INSERT INTO pagos_prestamo (prestamo_id, numero_cuota, monto)
-            VALUES (%s, %s, %s)
-            """,
-            (prestamo_id, numero_cuota, monto_pago),
+        pago = PagoPrestamo(
+            prestamo_id=prestamo_id,
+            numero_cuota=numero_cuota,
+            monto=monto_pago,
         )
-        pago_id = cursor.lastrowid
-        cursor.execute(
-            "SELECT fecha_pago FROM pagos_prestamo WHERE id = %s",
-            (pago_id,),
-        )
-        pago = cursor.fetchone()
+        session.add(pago)
+        session.flush()
+        session.refresh(pago)
 
-        cuotas_actualizadas = _cargar_cuotas_prestamo(cursor, prestamo_id)
+        cuotas_actualizadas = _cargar_cuotas_prestamo(session, prestamo_id)
         if all(item["total_pendiente"] == 0 for item in cuotas_actualizadas):
             estado = "Pagado"
         elif any(
@@ -240,23 +221,13 @@ def registrar_abono_cuota(
             estado = "Vencido"
         else:
             estado = "Activo"
-        cursor.execute(
-            "UPDATE prestamo SET estado = %s WHERE id = %s",
-            (estado, prestamo_id),
-        )
-        conexion.commit()
+        prestamo.estado = estado
+        session.flush()
         return {
-            "id": pago_id,
-            "fecha_pago": pago["fecha_pago"],
+            "id": pago.id,
+            "fecha_pago": pago.fecha_pago,
             "estado_prestamo": estado,
         }
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
 
 
 def actualizar_prestamo(
@@ -270,27 +241,23 @@ def actualizar_prestamo(
     if estado not in {"Activo", "Pagado", "Vencido"}:
         raise ValueError("El estado del préstamo no es válido.")
 
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        asegurar_esquema_prestamos(cursor)
-        cursor.execute(
-            "SELECT id, monto, plazo FROM prestamo WHERE id = %s FOR UPDATE",
-            (prestamo_id,),
+    with obtener_sesion() as session, session.begin():
+        asegurar_esquema_prestamos(session)
+        prestamo = session.scalar(
+            select(Prestamo)
+            .where(Prestamo.id == prestamo_id)
+            .with_for_update()
         )
-        prestamo = cursor.fetchone()
         if prestamo is None:
-            conexion.rollback()
             return False
-        cursor.execute(
-            "SELECT COUNT(*) AS cantidad FROM pagos_prestamo "
-            "WHERE prestamo_id = %s",
-            (prestamo_id,),
+        cantidad_pagos = session.scalar(
+            select(func.count(PagoPrestamo.id)).where(
+                PagoPrestamo.prestamo_id == prestamo_id
+            )
         )
-        if cursor.fetchone()["cantidad"] and (
-            Decimal(str(prestamo["monto"])) != Decimal(str(monto))
-            or prestamo["plazo"] != plazo
+        if cantidad_pagos and (
+            Decimal(str(prestamo.monto)) != Decimal(str(monto))
+            or prestamo.plazo != plazo
         ):
             raise ValueError(
                 "No se puede cambiar el monto o plazo de un préstamo "
@@ -298,94 +265,69 @@ def actualizar_prestamo(
             )
         if estado == "Pagado" and any(
             cuota["total_pendiente"] > 0
-            for cuota in _cargar_cuotas_prestamo(cursor, prestamo_id)
+            for cuota in _cargar_cuotas_prestamo(session, prestamo_id)
         ):
             raise ValueError(
                 "No se puede marcar como pagado un préstamo que aún tiene "
                 "saldo pendiente."
             )
-        cursor.execute(
-            """
-            UPDATE prestamo
-            SET monto = %s, plazo = %s, estado = %s
-            WHERE id = %s
-            """,
-            (monto, plazo, estado, prestamo_id),
-        )
-        conexion.commit()
+        prestamo.monto = monto
+        prestamo.plazo = plazo
+        prestamo.estado = estado
         return True
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
 
 
 def eliminar_prestamo(prestamo_id: int) -> bool:
     validar_id(prestamo_id)
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("DELETE FROM prestamo WHERE id = %s", (prestamo_id,))
-        conexion.commit()
-        return cursor.rowcount > 0
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+    with obtener_sesion() as session, session.begin():
+        resultado = session.execute(
+            delete(Prestamo).where(Prestamo.id == prestamo_id)
+        )
+        return resultado.rowcount > 0
+
+
+def _listar_prestamos(session: Session, consulta) -> list[dict[str, Any]]:
+    filas = session.execute(consulta).mappings().all()
+    return _agregar_cuotas_pendientes(
+        session,
+        [dict(fila) for fila in filas],
+    )
 
 
 def listar_prestamos(cliente_id: int) -> list[dict[str, Any]]:
     validar_id(cliente_id)
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        asegurar_esquema_prestamos(cursor)
-        cursor.execute(
-            """
-            SELECT id, monto, plazo, estado, fecha_primer_pago, frecuencia_pago
-            FROM prestamo
-            WHERE cliente_id = %s
-            ORDER BY id
-            """,
-            (cliente_id,),
+    with obtener_sesion() as session, session.begin():
+        asegurar_esquema_prestamos(session)
+        return _listar_prestamos(
+            session,
+            select(
+                Prestamo.id,
+                Prestamo.monto,
+                Prestamo.plazo,
+                Prestamo.estado,
+                Prestamo.fecha_primer_pago,
+                Prestamo.frecuencia_pago,
+            )
+            .where(Prestamo.cliente_id == cliente_id)
+            .order_by(Prestamo.id),
         )
-        prestamos = _agregar_cuotas_pendientes(cursor, cursor.fetchall())
-        conexion.commit()
-        return prestamos
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
 
 
 def listar_todos_los_prestamos() -> list[dict[str, Any]]:
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        asegurar_esquema_prestamos(cursor)
-        cursor.execute(
-            """
-            SELECT id, cliente_id, monto, plazo, estado, fecha_primer_pago, frecuencia_pago
-            FROM prestamo
-            ORDER BY cliente_id, id
-            """
+    with obtener_sesion() as session, session.begin():
+        asegurar_esquema_prestamos(session)
+        return _listar_prestamos(
+            session,
+            select(
+                Prestamo.id,
+                Prestamo.cliente_id,
+                Prestamo.monto,
+                Prestamo.plazo,
+                Prestamo.estado,
+                Prestamo.fecha_primer_pago,
+                Prestamo.frecuencia_pago,
+            ).order_by(Prestamo.cliente_id, Prestamo.id),
         )
-        prestamos = _agregar_cuotas_pendientes(cursor, cursor.fetchall())
-        conexion.commit()
-        return prestamos
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
 
 
 def crear_prestamo(
@@ -402,34 +344,23 @@ def crear_prestamo(
     if estado not in {"Activo", "Pagado", "Vencido"}:
         raise ValueError("El estado del préstamo no es válido.")
     if estado == "Pagado":
-        raise ValueError("Un préstamo nuevo no puede estar pagado sin registrar sus abonos.")
-
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        asegurar_esquema_prestamos(cursor)
-        validar_cliente_sin_prestamos_pendientes(cursor, cliente_id)
-        cursor.execute(
-            """
-            INSERT INTO prestamo
-                (cliente_id, monto, plazo, estado, fecha_primer_pago)
-            VALUES (%s, %s, %s, %s, %s)
-            """,
-            (
-                cliente_id,
-                monto,
-                plazo,
-                estado,
-                fecha_primer_pago or _fecha_mes_siguiente(date.today()),
-            ),
+        raise ValueError(
+            "Un préstamo nuevo no puede estar pagado sin registrar sus abonos."
         )
-        conexion.commit()
-        return cursor.lastrowid
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+
+    with obtener_sesion() as session, session.begin():
+        asegurar_esquema_prestamos(session)
+        validar_cliente_sin_prestamos_pendientes(session, cliente_id)
+        prestamo = Prestamo(
+            cliente_id=cliente_id,
+            monto=monto,
+            plazo=plazo,
+            estado=estado,
+            fecha_primer_pago=(
+                fecha_primer_pago or _fecha_mes_siguiente(date.today())
+            ),
+            frecuencia_pago="Mensual",
+        )
+        session.add(prestamo)
+        session.flush()
+        return prestamo.id

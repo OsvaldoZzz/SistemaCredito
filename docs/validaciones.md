@@ -40,5 +40,6 @@ Desde la raíz del proyecto:
 python -m unittest discover -s tests -v
 ```
 
-Las pruebas usan conexiones simuladas y Qt sin mostrar ventanas.
-La integración con el servidor MySQL debe verificarse con la base de datos local.
+Las pruebas de CRUD usan una base SQLite temporal con los mismos modelos ORM;
+las pruebas de interfaz usan Qt sin mostrar ventanas. La conexión con el
+servidor MySQL debe verificarse con la base de datos local.

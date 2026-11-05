@@ -2,11 +2,20 @@
 
 La nueva versión **React + JavaScript** está en [`web/`](web/README.md), con
 interés del 15 % para préstamos nuevos y una copia independiente de MySQL.
-La aplicación Python conserva su código y su base original.
+La aplicación de escritorio también calcula el interés total al 15 % sobre
+el capital; la mora se mantiene en 2 % mensual. Como la base original no guarda
+la tasa por préstamo, el 15 % también se aplica al volver a calcular los
+préstamos existentes.
 
 Aplicación de escritorio con PySide6, MySQL y reportes PDF.
 
 ## Ejecutar
+
+Instala las dependencias de Python desde la raíz del proyecto:
+
+```powershell
+python -m pip install -r requirements.txt
+```
 
 Desde la carpeta del proyecto:
 
@@ -19,7 +28,12 @@ También puedes ejecutar `app/ui/login.py` directamente desde el IDE,
 o usar `python -m app.ui.login` desde la carpeta del proyecto.
 Las imágenes y los reportes usan rutas basadas en la ubicación del proyecto.
 
-Dependencias: `PySide6`, `mysql-connector-python` y `reportlab`.
+Las operaciones CRUD usan SQLAlchemy ORM sobre MySQL y el controlador
+`mysql-connector-python`. Los modelos existentes se encuentran en
+`app/datos/modelos.py`; las tablas originales se conservan. Las tablas de
+abonos, solicitudes y asignaciones se crean al necesitarlas, y las columnas
+adicionales de las tablas originales se agregan de forma compatible.
+
 La conexión admite las variables `DB_HOST`, `DB_PORT`, `DB_USER`,
 `DB_PASSWORD` y `DB_NAME`, configuradas en el entorno antes de iniciar.
 La base de datos debe disponer de las tablas `clientes`, `prestamo` y

@@ -1,6 +1,9 @@
 from datetime import date
 
-from app.config.conexion import obtener_conexion
+from sqlalchemy import select
+
+from app.config.conexion import obtener_sesion
+from app.datos.modelos import Cita, Cliente
 from app.logica.validaciones import validar_fecha, validar_id
 
 
@@ -8,72 +11,46 @@ def crear_cita(cliente_id: int, fecha: date) -> int:
     validar_id(cliente_id)
     validar_fecha(fecha)
 
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor()
-        cursor.execute(
-            "SELECT id FROM citas WHERE cliente_id = %s AND fecha = %s LIMIT 1",
-            (cliente_id, fecha),
+    with obtener_sesion() as session, session.begin():
+        existente = session.scalar(
+            select(Cita.id)
+            .where(Cita.cliente_id == cliente_id, Cita.fecha == fecha)
+            .limit(1)
         )
-        if cursor.fetchone() is not None:
+        if existente is not None:
             raise ValueError("Ya tienes una cita registrada para esa fecha.")
-        cursor.execute(
-            """
-            INSERT INTO citas (cliente_id, fecha)
-            VALUES (%s, %s)
-            """,
-            (cliente_id, fecha),
-        )
-        conexion.commit()
-        return cursor.lastrowid
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+        cita = Cita(cliente_id=cliente_id, fecha=fecha, estado="Pendiente")
+        session.add(cita)
+        session.flush()
+        return cita.id
 
 
 def listar_citas(cliente_id: int) -> list[dict]:
     validar_id(cliente_id)
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        cursor.execute(
-            """
-            SELECT id, fecha, estado
-            FROM citas
-            WHERE cliente_id = %s
-            ORDER BY fecha, id
-            """,
-            (cliente_id,),
-        )
-        return cursor.fetchall()
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+    with obtener_sesion() as session:
+        citas = session.scalars(
+            select(Cita)
+            .where(Cita.cliente_id == cliente_id)
+            .order_by(Cita.fecha, Cita.id)
+        ).all()
+        return [
+            {"id": cita.id, "fecha": cita.fecha, "estado": cita.estado}
+            for cita in citas
+        ]
 
 
 def listar_todas_las_citas() -> list[dict]:
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        cursor.execute(
-            """
-            SELECT citas.id, citas.cliente_id, citas.fecha, citas.estado,
-                   clientes.nombre, clientes.cedula
-            FROM citas
-            JOIN clientes ON clientes.id = citas.cliente_id
-            ORDER BY citas.fecha, citas.id
-            """
-        )
-        return cursor.fetchall()
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+    with obtener_sesion() as session:
+        filas = session.execute(
+            select(
+                Cita.id,
+                Cita.cliente_id,
+                Cita.fecha,
+                Cita.estado,
+                Cliente.nombre,
+                Cliente.cedula,
+            )
+            .join(Cliente, Cliente.id == Cita.cliente_id)
+            .order_by(Cita.fecha, Cita.id)
+        ).mappings()
+        return [dict(fila) for fila in filas]

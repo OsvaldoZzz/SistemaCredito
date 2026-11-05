@@ -6,7 +6,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QDate, QSize, Qt
 from PySide6.QtWidgets import QHeaderView
-from mysql.connector import Error as MySQLConnectorError
+from app.config.errores_db import ERRORES_BASE_DATOS
 from app.reportes.reportes_pdf import generar_estado_cartera, generar_reporte_cobranza
 from app.datos.clientes_crud import actualizar_cliente, crear_cliente, eliminar_cliente, listar_clientes
 from app.datos.usuarios_crud import (
@@ -963,7 +963,7 @@ class AdminWindow(QMainWindow):
             except ValueError as error:
                 QMessageBox.warning(dialogo, "Asignación inválida", str(error))
                 return
-            except (MySQLConnectorError, OSError) as error:
+            except ERRORES_BASE_DATOS + (OSError,) as error:
                 QMessageBox.critical(
                     dialogo,
                     "Error al guardar asignación",
@@ -1298,7 +1298,7 @@ class AdminWindow(QMainWindow):
                     password=nueva_password or None,
                     **({"ubicacion": punto} if punto != punto_original else {}),
                 )
-            except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
                 QMessageBox.critical(dialogo, "Error al actualizar", f"No se pudo guardar el cliente: {error}")
                 return
             if not actualizado:
@@ -1396,7 +1396,7 @@ class AdminWindow(QMainWindow):
             except ValueError as error:
                 QMessageBox.warning(dialogo, "Datos inválidos", str(error))
                 return
-            except MySQLConnectorError as error:
+            except ERRORES_BASE_DATOS as error:
                 QMessageBox.critical(
                     dialogo,
                     "Error al actualizar usuario",
@@ -1436,7 +1436,7 @@ class AdminWindow(QMainWindow):
         cliente_id = cliente_actual.get("id") if cliente_actual else None
         try:
             clientes = listar_clientes()
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al actualizar",
@@ -2038,7 +2038,7 @@ class AdminWindow(QMainWindow):
 
         try:
             mostrar_detalle_prestamo(self, int(id_item.text()))
-        except (MySQLConnectorError, OSError, TypeError, ValueError) as error:
+        except ERRORES_BASE_DATOS + (OSError, TypeError, ValueError) as error:
             mostrar_error_detalle_prestamo(self, error)
 
     def editarPrestamoDesdeBoton(self):
@@ -2065,7 +2065,7 @@ class AdminWindow(QMainWindow):
         if respuesta == QMessageBox.Yes:
             try:
                 eliminado = eliminar_prestamo(int(id_prestamo))
-            except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
                 QMessageBox.critical(
                     self,
                     "Error al eliminar préstamo",
@@ -2134,7 +2134,7 @@ class AdminWindow(QMainWindow):
             if respuesta == QMessageBox.Yes:
                 try:
                     eliminado = eliminar_prestamo(int(id_prestamo))
-                except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+                except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
                     QMessageBox.critical(
                         self,
                         "Error al eliminar préstamo",
@@ -2309,7 +2309,7 @@ class AdminWindow(QMainWindow):
                 plazo_input.value(),
                 estado_input.currentText(),
             )
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al actualizar préstamo",
@@ -2564,7 +2564,7 @@ class AdminWindow(QMainWindow):
 
         try:
             registrado = abrir_dialogo_abono(self, int(id_item.text()))
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al registrar abono",
@@ -2577,7 +2577,7 @@ class AdminWindow(QMainWindow):
     def verSolicitudes(self):
         try:
             solicitudes = listar_solicitudes_pendientes()
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self,
                 "Error al cargar solicitudes",
@@ -2695,7 +2695,8 @@ class AdminWindow(QMainWindow):
         tabla.setHorizontalHeaderLabels(
             [
                 "ID", "Cliente", "Cédula", "Ingreso mensual", "Monto solicitado",
-                "Interés (2%)", "Total", "Plazo", "Frecuencia", "Fecha"
+                f"Interés ({PORCENTAJE_INTERES:.0f}%)",
+                "Total", "Plazo", "Frecuencia", "Fecha"
             ]
         )
         tabla.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -2766,7 +2767,7 @@ class AdminWindow(QMainWindow):
                         fecha_primer_pago_input.date().toString("yyyy-MM-dd")
                     ) if aprobada else None,
                 )
-            except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+            except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
                 QMessageBox.critical(
                     dialogo,
                     "Error al resolver solicitud",
@@ -2810,7 +2811,7 @@ class AdminWindow(QMainWindow):
                 self.clientes,
                 self.obtenerPrestamosGlobales()
             )
-        except (MySQLConnectorError, OSError, ValueError, KeyError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, KeyError) as error:
             QMessageBox.critical(
                 self,
                 "Error al generar reporte",
@@ -2830,7 +2831,7 @@ class AdminWindow(QMainWindow):
                 self.clientes,
                 self.obtenerPrestamosGlobales()
             )
-        except (MySQLConnectorError, OSError, ValueError, KeyError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, KeyError) as error:
             QMessageBox.critical(
                 self,
                 "Error al generar reporte",

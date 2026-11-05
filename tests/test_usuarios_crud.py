@@ -1,128 +1,73 @@
 import unittest
-from unittest.mock import MagicMock, patch
 
-from app.datos import usuarios_crud
+from app.config.conexion import obtener_sesion
+from app.datos.modelos import Cliente, Usuario
+from app.datos.usuarios_crud import (
+    actualizar_usuario,
+    guardar_asignaciones_cobrador,
+    listar_usuarios,
+)
+from orm_test_utils import OrmTestCase
 
 
-class UsuariosCrudTest(unittest.TestCase):
-    def test_guardar_asignaciones_reemplaza_en_una_transaccion(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.fetchone.return_value = ("cobrador",)
-        cursor.fetchall.return_value = [(11,), (12,)]
+class UsuariosCrudTest(OrmTestCase):
+    def setUp(self):
+        super().setUp()
+        with obtener_sesion() as session, session.begin():
+            session.add_all([
+                Usuario(id=7, rol="cobrador", nombre="Cobrador", password="clave1234"),
+                Usuario(id=8, rol="recepcionista", nombre="Recepción", password="clave5678"),
+                Cliente(
+                    id=11, nombre="Ana", cedula="12345678", correo="ana@example.com",
+                    password="clave1234", direccion="Centro", monto=0,
+                ),
+                Cliente(
+                    id=12, nombre="Luis", cedula="87654321", correo="luis@example.com",
+                    password="clave5678", direccion="Centro", monto=0,
+                ),
+            ])
 
-        with patch.object(usuarios_crud, "obtener_conexion", return_value=conexion):
-            guardado = usuarios_crud.guardar_asignaciones_cobrador(
-                7, [11, 12, 11]
-            )
-
-        self.assertTrue(guardado)
-        cursor.executemany.assert_called_once_with(
-            """
-                INSERT INTO cobrador_clientes (cobrador_id, cliente_id)
-                VALUES (%s, %s)
-                """,
-            [(7, 11), (7, 12)],
-        )
-        conexion.commit.assert_called_once()
-        conexion.rollback.assert_not_called()
-        cursor.close.assert_called_once()
-        conexion.close.assert_called_once()
-
-    def test_guardar_asignaciones_rechaza_ids_invalidos_y_revierte(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.fetchone.return_value = ("cobrador",)
-        cursor.fetchall.return_value = [(11,)]
-
-        with patch.object(usuarios_crud, "obtener_conexion", return_value=conexion):
-            with self.assertRaisesRegex(ValueError, "ya no existen"):
-                usuarios_crud.guardar_asignaciones_cobrador(7, [11, 12])
-
-        conexion.commit.assert_not_called()
-        conexion.rollback.assert_called_once()
-
-    def test_guardar_asignaciones_rechaza_usuario_que_no_es_cobrador(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.fetchone.return_value = ("recepcionista",)
-
-        with patch.object(usuarios_crud, "obtener_conexion", return_value=conexion):
-            with self.assertRaisesRegex(ValueError, "Solo se pueden asignar"):
-                usuarios_crud.guardar_asignaciones_cobrador(7, [])
-
-        conexion.commit.assert_not_called()
-        conexion.rollback.assert_called_once()
-
-    def test_listar_usuarios_incluye_asignaciones_persistidas(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.fetchall.side_effect = [
-            [
-                {"id": 7, "rol": "cobrador", "nombre": "Cobrador", "password": "clave1234"},
-                {"id": 8, "rol": "recepcionista", "nombre": "Recepción", "password": "clave5678"},
-            ],
-            [{"cobrador_id": 7, "cliente_id": 11}],
-        ]
-
-        with patch.object(usuarios_crud, "obtener_conexion", return_value=conexion):
-            usuarios = usuarios_crud.listar_usuarios()
-
-        self.assertEqual(usuarios[0]["clientes_asignados"], ["id:11"])
+    def test_guardar_asignaciones_reemplaza_y_quita_duplicados(self):
+        self.assertTrue(guardar_asignaciones_cobrador(7, [11, 12, 11]))
+        usuarios = listar_usuarios()
+        self.assertEqual(usuarios[0]["clientes_asignados"], ["id:11", "id:12"])
         self.assertNotIn("clientes_asignados", usuarios[1])
 
-    def test_actualizar_usuario_guarda_cambios_y_conserva_password_vacio(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.fetchone.side_effect = [{"id": 7, "password": "clave1234"}, None]
-
-        with patch.object(usuarios_crud, "obtener_conexion", return_value=conexion):
-            actualizado = usuarios_crud.actualizar_usuario(
-                7, "Nombre Actualizado", "recepcionista"
-            )
-
-        self.assertTrue(actualizado)
+        guardar_asignaciones_cobrador(7, [12])
         self.assertEqual(
-            cursor.execute.call_args_list[-1].args,
-            (
-                "UPDATE usuarios SET nombre = %s, rol = %s WHERE id = %s",
-                ("Nombre Actualizado", "recepcionista", 7),
-            ),
+            listar_usuarios()[0]["clientes_asignados"],
+            ["id:12"],
         )
-        conexion.commit.assert_called_once()
-        conexion.rollback.assert_not_called()
-        cursor.close.assert_called_once()
-        conexion.close.assert_called_once()
 
-    def test_actualizar_usuario_rechaza_nombre_duplicado_y_revierte(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.fetchone.side_effect = [{"id": 7, "password": "clave1234"}, {"id": 8}]
+    def test_asignar_rechaza_ids_inexistentes_sin_perder_asignaciones(self):
+        guardar_asignaciones_cobrador(7, [11])
+        with self.assertRaisesRegex(ValueError, "ya no existen"):
+            guardar_asignaciones_cobrador(7, [11, 99])
+        self.assertEqual(
+            listar_usuarios()[0]["clientes_asignados"],
+            ["id:11"],
+        )
 
-        with patch.object(usuarios_crud, "obtener_conexion", return_value=conexion):
-            with self.assertRaisesRegex(ValueError, "Ya existe un usuario"):
-                usuarios_crud.actualizar_usuario(
-                    7, "Nombre Existente", "recepcionista"
-                )
+    def test_asignar_solo_a_cobradores_existentes(self):
+        with self.assertRaisesRegex(ValueError, "Solo se pueden asignar"):
+            guardar_asignaciones_cobrador(8, [])
+        with self.assertRaisesRegex(ValueError, "ya no existe"):
+            guardar_asignaciones_cobrador(99, [])
 
-        conexion.commit.assert_not_called()
-        conexion.rollback.assert_called_once()
-        cursor.close.assert_called_once()
-        conexion.close.assert_called_once()
+    def test_actualizar_usuario_conserva_password_si_no_se_indica(self):
+        self.assertTrue(actualizar_usuario(7, "Nombre Actualizado", "recepcionista"))
+        with obtener_sesion() as session:
+            usuario = session.get(Usuario, 7)
+            self.assertEqual(usuario.nombre, "Nombre Actualizado")
+            self.assertEqual(usuario.rol, "recepcionista")
+            self.assertEqual(usuario.password, "clave1234")
+
+    def test_actualizar_usuario_rechaza_nombre_duplicado(self):
+        with self.assertRaisesRegex(ValueError, "Ya existe un usuario"):
+            actualizar_usuario(7, "Recepción", "cobrador")
 
     def test_actualizar_usuario_indica_si_no_existe(self):
-        conexion = MagicMock()
-        cursor = conexion.cursor.return_value
-        cursor.fetchone.return_value = None
-
-        with patch.object(usuarios_crud, "obtener_conexion", return_value=conexion):
-            actualizado = usuarios_crud.actualizar_usuario(
-                99, "Nombre Nuevo", "cobrador"
-            )
-
-        self.assertFalse(actualizado)
-        conexion.commit.assert_not_called()
-        conexion.rollback.assert_not_called()
+        self.assertFalse(actualizar_usuario(99, "Usuario Nuevo", "cobrador"))
 
 
 if __name__ == "__main__":

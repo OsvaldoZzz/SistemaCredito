@@ -1,9 +1,16 @@
 from typing import Any
 
-from app.logica.ubicacion import validar_coordenadas
+from sqlalchemy import func, inspect, select, text, update, delete
 
-from app.config.conexion import obtener_conexion
-from app.logica.validaciones import validar_datos_cliente, validar_direccion, validar_id, validar_monto
+from app.config.conexion import obtener_sesion
+from app.datos.modelos import Cliente
+from app.logica.ubicacion import validar_coordenadas
+from app.logica.validaciones import (
+    validar_datos_cliente,
+    validar_direccion,
+    validar_id,
+    validar_monto,
+)
 
 
 _ubicacion_lista = False
@@ -14,22 +21,21 @@ def asegurar_columnas_ubicacion() -> None:
     global _ubicacion_lista
     if _ubicacion_lista:
         return
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor()
+    with obtener_sesion() as session:
+        columnas = {
+            columna["name"]
+            for columna in inspect(session.connection()).get_columns("clientes")
+        }
         for columna in ("latitud", "longitud"):
-            cursor.execute("SHOW COLUMNS FROM clientes LIKE %s", (columna,))
-            if not cursor.fetchall():
-                cursor.execute(
-                    f"ALTER TABLE clientes ADD COLUMN {columna} DECIMAL(10, 7) NULL"
+            if columna not in columnas:
+                session.execute(
+                    text(
+                        f"ALTER TABLE clientes ADD COLUMN {columna} "
+                        "DECIMAL(10, 7) NULL"
+                    )
                 )
-        conexion.commit()
+        session.commit()
         _ubicacion_lista = True
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
 
 
 def _validar_cliente(nombre, cedula, correo, password, direccion):
@@ -38,14 +44,14 @@ def _validar_cliente(nombre, cedula, correo, password, direccion):
         raise ValueError(error)
 
 
-def _comprobar_duplicado(cursor, cedula, correo, cliente_id=None):
-    sql = "SELECT id FROM clientes WHERE (LOWER(TRIM(cedula)) = %s OR LOWER(TRIM(correo)) = %s)"
-    parametros = [cedula.casefold(), correo.casefold()]
+def _comprobar_duplicado(session, cedula, correo, cliente_id=None):
+    consulta = select(Cliente.id).where(
+        (func.lower(func.trim(Cliente.cedula)) == cedula.casefold())
+        | (func.lower(func.trim(Cliente.correo)) == correo.casefold())
+    )
     if cliente_id is not None:
-        sql += " AND id <> %s"
-        parametros.append(cliente_id)
-    cursor.execute(sql + " LIMIT 1", tuple(parametros))
-    if cursor.fetchone() is not None:
+        consulta = consulta.where(Cliente.id != cliente_id)
+    if session.scalar(consulta.limit(1)) is not None:
         raise ValueError("Ya existe un cliente con esa cédula o correo.")
 
 
@@ -62,73 +68,67 @@ def crear_cliente(
     """Crea un cliente y devuelve el ID generado."""
     _validar_cliente(nombre, cedula, correo, password, direccion)
     monto = validar_monto(monto, permitir_cero=True)
-    nombre, cedula, correo, direccion = (v.strip() for v in (nombre, cedula, correo, direccion))
+    nombre, cedula, correo, direccion = (
+        valor.strip() for valor in (nombre, cedula, correo, direccion)
+    )
     latitud, longitud = validar_coordenadas(latitud, longitud)
     asegurar_columnas_ubicacion()
-    sql = """
-        INSERT INTO clientes
-            (nombre, cedula, correo, password, direccion, monto, latitud, longitud)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor()
-        _comprobar_duplicado(cursor, cedula, correo)
-        cursor.execute(sql, (nombre, cedula, correo, password, direccion, monto, latitud, longitud))
-        conexion.commit()
-        return cursor.lastrowid
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+    with obtener_sesion() as session, session.begin():
+        _comprobar_duplicado(session, cedula, correo)
+        cliente = Cliente(
+            nombre=nombre,
+            cedula=cedula,
+            correo=correo,
+            password=password,
+            direccion=direccion,
+            monto=monto,
+            latitud=latitud,
+            longitud=longitud,
+        )
+        session.add(cliente)
+        session.flush()
+        return cliente.id
 
 
 def listar_clientes() -> list[dict[str, Any]]:
     """Devuelve todos los clientes."""
     asegurar_columnas_ubicacion()
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        cursor.execute(
-            """
-            SELECT id, nombre, cedula, correo, password, direccion, monto, latitud, longitud
-            FROM clientes
-            ORDER BY id
-            """
-        )
-        return cursor.fetchall()
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+    with obtener_sesion() as session:
+        clientes = session.scalars(select(Cliente).order_by(Cliente.id)).all()
+        return [
+            {
+                "id": cliente.id,
+                "nombre": cliente.nombre,
+                "cedula": cliente.cedula,
+                "correo": cliente.correo,
+                "password": cliente.password,
+                "direccion": cliente.direccion,
+                "monto": cliente.monto,
+                "latitud": cliente.latitud,
+                "longitud": cliente.longitud,
+            }
+            for cliente in clientes
+        ]
 
 
 def obtener_cliente(cliente_id: int) -> dict[str, Any] | None:
     """Busca un cliente por su ID."""
     validar_id(cliente_id)
     asegurar_columnas_ubicacion()
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        cursor.execute(
-            """
-            SELECT id, nombre, cedula, correo, direccion, monto, latitud, longitud
-            FROM clientes
-            WHERE id = %s
-            """,
-            (cliente_id,),
-        )
-        return cursor.fetchone()
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+    with obtener_sesion() as session:
+        cliente = session.get(Cliente, cliente_id)
+        if cliente is None:
+            return None
+        return {
+            "id": cliente.id,
+            "nombre": cliente.nombre,
+            "cedula": cliente.cedula,
+            "correo": cliente.correo,
+            "direccion": cliente.direccion,
+            "monto": cliente.monto,
+            "latitud": cliente.latitud,
+            "longitud": cliente.longitud,
+        }
 
 
 def actualizar_cliente(
@@ -144,41 +144,40 @@ def actualizar_cliente(
 ) -> bool:
     """Actualiza los datos de un cliente. Devuelve si encontró el registro."""
     validar_id(cliente_id)
-    _validar_cliente(nombre, cedula, correo, password if password is not None else "********", direccion)
+    _validar_cliente(
+        nombre,
+        cedula,
+        correo,
+        password if password is not None else "********",
+        direccion,
+    )
     monto = validar_monto(monto, permitir_cero=True)
-    nombre, cedula, correo, direccion = (v.strip() for v in (nombre, cedula, correo, direccion))
+    nombre, cedula, correo, direccion = (
+        valor.strip() for valor in (nombre, cedula, correo, direccion)
+    )
     if ubicacion is not None:
         ubicacion = validar_coordenadas(*ubicacion)
         asegurar_columnas_ubicacion()
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor()
-        _comprobar_duplicado(cursor, cedula, correo, cliente_id)
-        sql = """
-            UPDATE clientes
-            SET nombre = %s, cedula = %s, correo = %s,
-                direccion = %s, monto = %s
-        """
-        parametros = [nombre, cedula, correo, direccion, monto]
+    with obtener_sesion() as session, session.begin():
+        _comprobar_duplicado(session, cedula, correo, cliente_id)
+        valores = {
+            "nombre": nombre,
+            "cedula": cedula,
+            "correo": correo,
+            "direccion": direccion,
+            "monto": monto,
+        }
         if password is not None:
-            sql += ", password = %s"
-            parametros.append(password)
+            valores["password"] = password
         if ubicacion is not None:
-            sql += ", latitud = %s, longitud = %s"
-            parametros.extend(ubicacion)
-        sql += " WHERE id = %s"
-        parametros.append(cliente_id)
-        cursor.execute(sql, tuple(parametros))
-        conexion.commit()
-        return cursor.rowcount > 0
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+            valores.update(latitud=ubicacion[0], longitud=ubicacion[1])
+        resultado = session.execute(
+            update(Cliente)
+            .where(Cliente.id == cliente_id)
+            .values(**valores)
+            .execution_options(synchronize_session=False)
+        )
+        return resultado.rowcount > 0
 
 
 def actualizar_direccion_cliente(
@@ -193,49 +192,24 @@ def actualizar_direccion_cliente(
     if error:
         raise ValueError(error)
     latitud, longitud = validar_coordenadas(latitud, longitud)
-    direccion = direccion.strip()
     asegurar_columnas_ubicacion()
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor()
-        cursor.execute(
-            """
-            UPDATE clientes
-            SET direccion = %s, latitud = %s, longitud = %s
-            WHERE id = %s
-            """,
-            (direccion, latitud, longitud, cliente_id),
+    with obtener_sesion() as session, session.begin():
+        resultado = session.execute(
+            update(Cliente)
+            .where(Cliente.id == cliente_id)
+            .values(
+                direccion=direccion.strip(),
+                latitud=latitud,
+                longitud=longitud,
+            )
+            .execution_options(synchronize_session=False)
         )
-        conexion.commit()
-        return cursor.rowcount > 0
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
+        return resultado.rowcount > 0
 
 
 def eliminar_cliente(cliente_id: int) -> bool:
     """Elimina un cliente. Devuelve si encontró el registro."""
     validar_id(cliente_id)
-    conexion = obtener_conexion()
-    cursor = None
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("DELETE FROM clientes WHERE id = %s", (cliente_id,))
-        conexion.commit()
-        return cursor.rowcount > 0
-    except Exception:
-        conexion.rollback()
-        raise
-    finally:
-        if cursor is not None:
-            cursor.close()
-        conexion.close()
-
-
-if __name__ == "__main__":
-    print(listar_clientes())
+    with obtener_sesion() as session, session.begin():
+        resultado = session.execute(delete(Cliente).where(Cliente.id == cliente_id))
+        return resultado.rowcount > 0

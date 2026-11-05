@@ -1,4 +1,4 @@
-from mysql.connector import Error as MySQLConnectorError
+from app.config.errores_db import ERRORES_BASE_DATOS
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
@@ -96,7 +96,7 @@ def actualizar_direccion_con_dialogo(parent, cliente):
             actualizar_direccion_cliente(
                 int(cliente["id"]), direccion.text(), ubicacion.lat, ubicacion.lng,
             )
-        except (MySQLConnectorError, OSError, ValueError, TypeError) as error:
+        except ERRORES_BASE_DATOS + (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(dialogo, "Error al guardar", str(error))
             return
         cliente.update(direccion=direccion.text().strip(),
